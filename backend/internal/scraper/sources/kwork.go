@@ -29,7 +29,8 @@ var kworkCards = []string{
 	"[class*='want-card']",
 }
 
-var rubRe = regexp.MustCompile(`(\d[\d\s\u00a0,]*)\s*(?:₽|руб)`)
+// NBSP у Go-регекспах — це \x{00a0} (синтаксис \u не підтримується).
+var rubRe = regexp.MustCompile(`(\d[\d\s\x{00a0},]*)\s*(?:₽|руб)`)
 
 // parseKworkBudgetCents: «от 3 000 ₽» → 3000 USD-центів після конвертації курсом.
 func parseKworkBudgetCents(text string) *int {
@@ -90,7 +91,7 @@ func FetchKwork(ctx context.Context) ([]model.Listing, error) {
 				Raw:         raw,
 			})
 		})
-		if len(out) > 0 {
+	if len(out) > 0 {
 			break
 		}
 	}
