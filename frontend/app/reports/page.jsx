@@ -3,12 +3,32 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import StatCard from '@/components/StatCard';
-import { APP_RESULT_LABELS } from '@/lib/status';
+import Donut from '@/components/Donut';
+import { APP_RESULT_LABELS, statusLabel } from '@/lib/status';
+
+const STATUS_COLORS = {
+  new: '#3fcf8e',
+  seen: '#ffb547',
+  applied: '#5b8cff',
+  won: '#2ea87a',
+  lost: '#ff6b7a',
+  archived: '#8f9cb2',
+};
 
 function todayStr(offsetDays = 0) {
   const d = new Date();
   d.setDate(d.getDate() + offsetDays);
   return d.toISOString().slice(0, 10);
+}
+
+function money(cents) {
+  if (cents == null) return '—';
+  return `$${(cents / 100).toFixed(0)}`;
+}
+
+function delta(current, previous) {
+  if (previous == null || previous === 0) return null;
+  return Math.round(((current - previous) / previous) * 100);
 }
 
 // BarChart: горизонтальні CSS-бари (без бібліотек).
@@ -36,7 +56,7 @@ function BarChart({ title, rows }) {
   );
 }
 
-// Звіти: які замовлення ловились з яку по яку дату + заявки з результатами + CSV.
+// Звіти: період + порівняння з попереднім + заявки з результатами + CSV.
 export default function ReportsPage() {
   const [from, setFrom] = useState(todayStr(-30));
   const [to, setTo] = useState(todayStr());
@@ -91,6 +111,13 @@ export default function ReportsPage() {
     URL.revokeObjectURL(url);
   }
 
+  const prev = report?.previous;
+  const donutParts = (report?.by_status || []).map((s) => ({
+    label: statusLabel(s.status),
+    value: s.count,
+    color: STATUS_COLORS[s.status] || '#8f9cb2',
+  }));
+
   return (
     <section className="page">
       <div className="page__row" style={{ justifyContent: 'space-between' }}>
@@ -113,9 +140,39 @@ export default function ReportsPage() {
       </div>
 
       <div className="page__row">
-        <StatCard label="Замовлень впіймано" value={report?.total_orders ?? '—'} />
-        <StatCard label="Зникло (в архів)" value={report?.removed ?? '—'} />
-        <StatCard label="Заявок" value={report?.applications ?? '—'} />
+        <StatCard
+          label="Замовлень"
+          value={report?.total_orders ?? '—'}
+          delta={report && prev ? delta(report.total_orders, prev.total_orders) : null}
+          hint={prev ? `попередній період: ${prev.total_orders}` : undefined}
+        />
+        <StatCard
+          label="Зникло (архів)"
+          value={report?.removed ?? '—'}
+          delta={report && prev ? delta(report.removed, prev.removed) : null}
+          hint={prev ? `попередній період: ${prev.removed}` : undefined}
+        />
+        <StatCard
+          label="Заявок"
+          value={report?.applications ?? '—'}
+          delta={report && prev ? delta(report.applications, prev.applications) : null}
+          hint={prev ? `попередній період: ${prev.applications}` : undefined}
+        />
+        <StatCard
+          label="Сер. чек"
+          value={report ? money(report.avg_budget_cents) : '—'}
+          delta={
+            report && prev && report.avg_budget_cents && prev.avg_budget_cents
+              ? delta(report.avg_budget_cents, prev.avg_budget_cents)
+              : null
+          }
+          hint={prev?.avg_budget_cents ? `попередній: ${money(prev.avg_budget_cents)}` : undefined}
+        />
+      </div>
+
+      <div className="card">
+        <h2 className="feed__title">Статуси за період</h2>
+        <Donut parts={donutParts} />
       </div>
 
       <BarChart title="По вітках" rows={report?.by_branch || []} />

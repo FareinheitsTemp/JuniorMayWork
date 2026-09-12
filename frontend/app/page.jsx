@@ -7,9 +7,37 @@ import StatCard from '@/components/StatCard';
 import TreeView from '@/components/TreeView';
 import EventFeed from '@/components/EventFeed';
 import NewOrderAlert from '@/components/NewOrderAlert';
+import Donut from '@/components/Donut';
+import { statusLabel } from '@/lib/status';
+
+const STATUS_COLORS = {
+  new: '#3fcf8e',
+  seen: '#ffb547',
+  applied: '#5b8cff',
+  won: '#2ea87a',
+  lost: '#ff6b7a',
+  archived: '#8f9cb2',
+};
+
+function money(cents) {
+  if (cents == null) return '—';
+  return `$${(cents / 100).toFixed(0)}`;
+}
+
+function delta(current, previous) {
+  if (previous == null || previous === 0) return null;
+  return Math.round(((current - previous) / previous) * 100);
+}
+
+function todayStr(offsetDays = 0) {
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDays);
+  return d.toISOString().slice(0, 10);
+}
 
 export default function DashboardPage() {
   const [stats, setStats] = useState(null);
+  const [report, setReport] = useState(null);
   const [branches, setBranches] = useState([]);
   const [orders, setOrders] = useState([]);
   const [busy, setBusy] = useState(false);
@@ -17,12 +45,14 @@ export default function DashboardPage() {
 
   const load = useCallback(async () => {
     try {
-      const [st, br, ords] = await Promise.all([
+      const [st, rep, br, ords] = await Promise.all([
         api.stats(),
+        api.report(todayStr(-7), todayStr()),
         api.branches(),
         api.orders({ status: 'new', limit: 300 }),
       ]);
       setStats(st);
+      setReport(rep);
       setBranches(br || []);
       setOrders(ords || []);
     } catch (e) {
@@ -34,7 +64,7 @@ export default function DashboardPage() {
     load();
   }, [load]);
 
-  // живі події: новий листочок → оновлюємо дерево й статистику
+  // живі події: новий листочок → оновлюємо все
   useLive((event) => {
     if (event.type === 'new') {
       load();
@@ -67,6 +97,12 @@ export default function DashboardPage() {
     }
   }
 
+  const donutParts = (report?.by_status || []).map((s) => ({
+    label: statusLabel(s.status),
+    value: s.count,
+    color: STATUS_COLORS[s.status] || '#8f9cb2',
+  }));
+
   return (
     <section className="page">
       <NewOrderAlert />
@@ -81,10 +117,29 @@ export default function DashboardPage() {
 
       <div className="page__row">
         <StatCard label="Активні вітки" value={stats?.active_branches ?? '—'} />
-        <StatCard label="Замовлень в роботі" value={stats?.orders_active ?? '—'} />
-        <StatCard label="Нових сьогодні" value={stats?.orders_new_today ?? '—'} />
-        <StatCard label="Заявок" value={stats?.applications_total ?? '—'} />
-        <StatCard label="Виграно" value={stats?.won_total ?? '—'} />
+        <StatCard label="В роботі" value={stats?.orders_active ?? '—'} />
+        <StatCard
+          label="Нових сьогодні"
+          value={stats?.orders_new_today ?? '—'}
+          delta={stats ? delta(stats.orders_new_today, stats.orders_yesterday) : null}
+          hint="проти вчора"
+        />
+        <StatCard
+          label="За 7 днів"
+          value={stats?.orders_last_7_days ?? '—'}
+          delta={stats ? delta(stats.orders_last_7_days, stats.orders_prev_7_days) : null}
+          hint="проти минулого тижня"
+        />
+        <StatCard
+          label="Сер. чек"
+          value={stats ? money(stats.avg_budget_cents) : '—'}
+          hint={stats?.top_source ? `топ-джерело: ${stats.top_source}` : undefined}
+        />
+        <StatCard
+          label="Виграно"
+          value={stats?.won_total ?? '—'}
+          hint={stats ? `за місяць: ${stats.won_month}` : undefined}
+        />
       </div>
 
       <div className="dashboard">
@@ -92,7 +147,13 @@ export default function DashboardPage() {
           <h2 className="feed__title">Дерево замовлень</h2>
           <TreeView branches={branches} orders={orders} onAction={handleAction} />
         </div>
-        <EventFeed />
+        <div className="dashboard__side">
+          <div className="card">
+            <h2 className="feed__title">Статуси за 7 днів</h2>
+            <Donut parts={donutParts} />
+          </div>
+          <EventFeed />
+        </div>
       </div>
     </section>
   );

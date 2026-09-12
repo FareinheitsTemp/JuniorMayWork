@@ -18,7 +18,27 @@
   font-weight: 700;
 }
 
+.stat__delta {
+  font-size: 12px;
+  font-weight: 600;
+
+  &--up {
+    color: var(--good);
+  }
+
+  &--down {
+    color: var(--bad);
+  }
+}
+
 .stat__hint {
   font-size: 12px;
   color: var(--text-dim);
+}
+
+// права колонка дашборда (донат + фід)
+.dashboard__side {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
