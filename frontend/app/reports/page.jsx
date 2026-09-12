@@ -35,16 +35,22 @@ function BarChart({ title, rows }) {
   );
 }
 
-// Звіти: які замовлення ловились з яку по яку дату + експорт CSV.
+// Звіти: які замовлення ловились з яку по яку дату + заявки з результатами + CSV.
 export default function ReportsPage() {
   const [from, setFrom] = useState(todayStr(-30));
   const [to, setTo] = useState(todayStr());
   const [report, setReport] = useState(null);
+  const [apps, setApps] = useState([]);
   const [flash, setFlash] = useState('');
 
   const load = useCallback(async () => {
     try {
-      setReport(await api.report(from, to));
+      const [rep, applications] = await Promise.all([
+        api.report(from, to),
+        api.applications(200),
+      ]);
+      setReport(rep);
+      setApps(applications || []);
     } catch (e) {
       setFlash(`Помилка: ${e.message}`);
     }
@@ -53,6 +59,15 @@ export default function ReportsPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  async function setAppResult(id, result) {
+    try {
+      await api.setApplicationResult(id, result);
+      await load();
+    } catch (e) {
+      setFlash(`Помилка: ${e.message}`);
+    }
+  }
 
   function exportCsv() {
     if (!report) return;
@@ -97,7 +112,7 @@ export default function ReportsPage() {
       </div>
 
       <div className="page__row">
-        <StatCard label="Замовлень» впіймано" value={report?.total_orders ?? '—'} />
+        <StatCard label="Замовлень впіймано" value={report?.total_orders ?? '—'} />
         <StatCard label="Зникло (в архів)" value={report?.removed ?? '—'} />
         <StatCard label="Заявок" value={report?.applications ?? '—'} />
       </div>
@@ -105,6 +120,45 @@ export default function ReportsPage() {
       <BarChart title="По вітках" rows={report?.by_branch || []} />
       <BarChart title="По джерелах" rows={report?.by_source || []} />
       <BarChart title="По днях" rows={report?.daily || []} />
+
+      <div className="card">
+        <h2 className="feed__title">Заявки та результати</h2>
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Дата</th>
+              <th>Замовлення</th>
+              <th>Нотатка</th>
+              <th>Результат</th>
+            </tr>
+          </thead>
+          <tbody>
+            {apps.length === 0 && (
+              <tr>
+                <td colSpan={4} className="page__hint">Заявок поки не було.</td>
+              </tr>
+            )}
+            {apps.map((a) => (
+              <tr key={a.id}>
+                <td>{new Date(a.applied_at).toLocaleString('uk-UA')}</td>
+                <td>{a.order_title}</td>
+                <td>{a.note || '—'}</td>
+                <td>
+                  <select
+                    className="select"
+                    value={a.result}
+                    onChange={(e) => setAppResult(a.id, e.target.value)}
+                  >
+                    {['pending', 'accepted', 'declined'].map((r) => (
+                      <option key={r} value={r}>{r}</option>
+                    ))}
+                  </select>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </section>
   );
 }
