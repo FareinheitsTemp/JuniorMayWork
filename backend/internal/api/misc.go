@@ -109,6 +109,11 @@ func (s *Server) HandleReport(w http.ResponseWriter, r *http.Request) {
 		writeStoreErr(w, err)
 		return
 	}
+	// попередній період такої самої довжини — щоб було з чим порівнювати
+	prevFrom := from.Add(-(to.Sub(from)))
+	if prev, err := s.store.ReportSummary(r.Context(), prevFrom, from); err == nil {
+		rep.Previous = &prev
+	}
 	writeJSON(w, http.StatusOK, rep)
 }
 

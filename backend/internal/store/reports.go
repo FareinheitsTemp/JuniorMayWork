@@ -1,4 +1,4 @@
-// Пакет store: звіти за діапазоном дат і статистика дашборда.
+// Пакет store: звіти за діапазоном дат і статистика дашборда (з дельтами для порівнянь).
 package store
 
 import (
@@ -27,15 +27,17 @@ type DailyCount struct {
 }
 
 type ReportSummary struct {
-	From         time.Time     `json:"from"`
-	To           time.Time     `json:"to"`
-	TotalOrders  int           `json:"total_orders"`
-	Removed      int           `json:"removed"`
-	Applications int           `json:"applications"`
-	ByBranch     []BranchCount `json:"by_branch"`
-	BySource     []SourceCount `json:"by_source"`
-	ByStatus     []StatusCount `json:"by_status"`
-	Daily        []DailyCount  `json:"daily"`
+	From            time.Time      `json:"from"`
+	To              time.Time      `json:"to"`
+	TotalOrders     int            `json:"total_orders"`
+	Removed         int            `json:"removed"`
+	Applications    int            `json:"applications"`
+	AvgBudgetCents  *int           `json:"avg_budget_cents"`
+	ByBranch        []BranchCount `json:"by_branch"`
+	BySource        []SourceCount `json:"by_source"`
+	ByStatus        []StatusCount `json:"by_status"`
+	Daily           []DailyCount  `json:"daily"`
+	Previous        *ReportSummary `json:"previous,omitempty"`
 }
 
 func (s *Store) ReportSummary(ctx context.Context, from, to time.Time) (ReportSummary, error) {
@@ -46,8 +48,10 @@ func (s *Store) ReportSummary(ctx context.Context, from, to time.Time) (ReportSu
 		SELECT
 			(SELECT COUNT(*) FROM orders WHERE first_seen_at >= $1 AND first_seen_at < $2),
 			(SELECT COUNT(*) FROM events WHERE type = 'removed' AND created_at >= $1 AND created_at < $2),
-			(SELECT COUNT(*) FROM applications WHERE applied_at >= $1 AND applied_at < $2)`,
-		from, to).Scan(&r.TotalOrders, &r.Removed, &r.Applications)
+			(SELECT COUNT(*) FROM applications WHERE applied_at >= $1 AND applied_at < $2),
+			(SELECT CAST(ROUND(AVG(budget_cents)) AS INTEGER) FROM orders
+			 WHERE budget_cents IS NOT NULL AND first_seen_at >= $1 AND first_seen_at < $2)`,
+		from, to).Scan(&r.TotalOrders, &r.Removed, &r.Applications, &r.AvgBudgetCents)
 	if err != nil {
 		return r, err
 	}
@@ -126,12 +130,21 @@ func (s *Store) ReportSummary(ctx context.Context, from, to time.Time) (ReportSu
 	return r, nil
 }
 
+// Stats: знімок дашборда з дельтами (вчора/тиждень/місяць) для порівнянь.
 type Stats struct {
-	ActiveBranches    int `json:"active_branches"`
-	OrdersActive       int `json:"orders_active"`
-	OrdersNewToday     int `json:"orders_new_today"`
-	ApplicationsTotal  int `json:"applications_total"`
-	WonTotal           int `json:"won_total"`
+	ActiveBranches    int    `json:"active_branches"`
+	OrdersActive       int    `json:"orders_active"`
+	OrdersNewToday     int    `json:"orders_new_today"`
+	OrdersYesterday    int    `json:"orders_yesterday"`
+	OrdersLast7Days    int    `json:"orders_last_7_days"`
+	OrdersPrev7Days    int    `json:"orders_prev_7_days"`
+	ApplicationsTotal  int    `json:"applications_total"`
+	ApplicationsWeek   int    `json:"applications_week"`
+	WonTotal           int    `json:"won_total"`
+	WonMonth            int    `json:"won_month"`
+	AvgBudgetCents     *int   `json:"avg_budget_cents"`
+	TopSource          string `json:"top_source"`
+	TopBranch          string `json:"top_branch"`
 }
 
 func (s *Store) Stats(ctx context.Context) (Stats, error) {
@@ -141,8 +154,19 @@ func (s *Store) Stats(ctx context.Context) (Stats, error) {
 			(SELECT COUNT(*) FROM branches WHERE is_active),
 			(SELECT COUNT(*) FROM orders WHERE status <> 'archived'),
 			(SELECT COUNT(*) FROM orders WHERE status = 'new' AND first_seen_at >= current_date),
+			(SELECT COUNT(*) FROM orders WHERE first_seen_at >= current_date - 1 AND first_seen_at < current_date),
+			(SELECT COUNT(*) FROM orders WHERE first_seen_at >= current_date - 7),
+			(SELECT COUNT(*) FROM orders WHERE first_seen_at >= current_date - 14 AND first_seen_at < current_date - 7),
 			(SELECT COUNT(*) FROM applications),
-			(SELECT COUNT(*) FROM orders WHERE status = 'won')`).
-		Scan(&st.ActiveBranches, &st.OrdersActive, &st.OrdersNewToday, &st.ApplicationsTotal, &st.WonTotal)
+			(SELECT COUNT(*) FROM applications WHERE applied_at >= current_date - 7),
+			(SELECT COUNT(*) FROM orders WHERE status = 'won'),
+			(SELECT COUNT(*) FROM orders WHERE status = 'won' AND first_seen_at >= current_date - 30),
+			(SELECT CAST(ROUND(AVG(budget_cents)) AS INTEGER) FROM orders WHERE budget_cents IS NOT NULL),
+			(SELECT COALESCE((SELECT source FROM orders GROUP BY source ORDER BY COUNT(*) DESC LIMIT 1), '')),
+			(SELECT COALESCE((SELECT b.name FROM orders o JOIN branches b ON b.id = o.branch_id
+			               GROUP BY b.name ORDER BY COUNT(*) DESC LIMIT 1), ''))`).
+		Scan(&st.ActiveBranches, &st.OrdersActive, &st.OrdersNewToday, &st.OrdersYesterday,
+			&st.OrdersLast7Days, &st.OrdersPrev7Days, &st.ApplicationsTotal, &st.ApplicationsWeek,
+			&st.WonTotal, &st.WonMonth, &st.AvgBudgetCents, &st.TopSource, &st.TopBranch)
 	return st, err
 }
