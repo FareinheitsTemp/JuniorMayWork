@@ -1,0 +1,21 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: jmw-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: jmw
+      POSTGRES_PASSWORD: jmw
+      POSTGRES_DB: jmw
+    ports:
+      - "5432:5432"
+    volumes:
+      - jmw-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jmw"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  jmw-pgdata:

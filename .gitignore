@@ -1,0 +1,17 @@
+# env
+.env
+.env.local
+
+# go
+backend/jmw
+backend/jmw.exe
+backend/data/
+
+# node
+node_modules/
+frontend/.next/
+frontend/out/
+
+# misc
+*.log
+.DS_Store
