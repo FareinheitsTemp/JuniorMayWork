@@ -26,7 +26,7 @@ type Order struct {
 	Description  string          `json:"description"`
 	BudgetCents  *int            `json:"budget_cents"`
 	Currency     string          `json:"currency"`
-	Skills       []string        `json:"skills"`
+	Skills      []string        `json:"skills"`
 	BranchID     *int64          `json:"branch_id"`
 	Status       string          `json:"status"`
 	FirstSeenAt  time.Time       `json:"first_seen_at"`
@@ -67,12 +67,14 @@ type Listing struct {
 }
 
 // EventPayload — снапшот у events.payload: живе навіть після видалення замовлення.
+// BudgetCents летить у WebSocket, щоб фронт одразу бачив суму (тости «до $50»).
 type EventPayload struct {
-	OrderID int64  `json:"order_id"`
-	Source  string `json:"source"`
-	URL     string `json:"url"`
-	Title   string `json:"title"`
-	Status  string `json:"status,omitempty"`
+	OrderID     int64  `json:"order_id"`
+	Source      string `json:"source"`
+	URL         string `json:"url"`
+	Title       string `json:"title"`
+	Status      string `json:"status,omitempty"`
+	BudgetCents *int   `json:"budget_cents,omitempty"`
 }
 
 func (p EventPayload) JSON() json.RawMessage {

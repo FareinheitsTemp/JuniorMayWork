@@ -32,6 +32,7 @@ Backend читає конфіг зі змінних оточення (`JMW_*`), 
 - **Вітки** (`branches`) — ваші ніші з ключовими словами та лімітом бюджету. Замовлення класифікується у вітку автоматично: найбільший збіг keywords за title+description, бюджет вкладається в ліміт.
 - **Статуси замовлення**: `new → seen → applied → won / lost / archived`.
 - **Заявки** (`applications`) — кнопка «подати заявку» фіксує спробу й результат (`pending / accepted / declined`), історія — на сторінці «Звіти» + живий фід показує, куди рухаються реквести.
+- **Події WebSocket** несуть бюджет замовлення (`payload.budget_cents`), тож фронт одразу бачить суму.
 
 ## Сторінки UI
 
@@ -50,6 +51,7 @@ Backend читає конфіг зі змінних оточення (`JMW_*`), 
 - **upwork** — RSS-пошук за запитами (react / javascript / next.js)
 - **reddit** — r/slavelabour і r/forhire через публічний JSON
 - **weblancer** — HTML weblancer.net/jobs через goquery (селектори захисні: якщо сайт змінить верстку, просто підкоригуй список `weblancerCards` у `weblancer.go`)
+- **kwork** — HTML kwork.ru/projects через goquery; бюджети в ₽ конвертуються у USD-центи за орієнтовним курсом (`kworkRubPerUsd` у `kwork.go`)
 
 Щоб додати новий сайт — реалізуй функцію `FetchMySite(ctx) ([]model.Listing, error)`, зареєструй її у `Sources()` і додай ім'я в `JMW_SOURCES`.
 

@@ -149,11 +149,12 @@ func (m *Manager) ingest(ctx context.Context, sourceName string, listings []mode
 // emit: подія в БД + розсилка підписникам WebSocket.
 func (m *Manager) emit(ctx context.Context, orderID *int64, typ string, o model.Order, status string) {
 	payload := model.EventPayload{
-		OrderID: o.ID,
-		Source:  o.Source,
-		URL:     o.URL,
-		Title:   o.Title,
-		Status:  status,
+		OrderID:     o.ID,
+		Source:      o.Source,
+		URL:         o.URL,
+		Title:       o.Title,
+		Status:      status,
+		BudgetCents: o.BudgetCents,
 	}
 	if err := m.store.InsertEvent(ctx, orderID, typ, payload); err != nil {
 		m.log.Error("запис події", "type", typ, "err", err)

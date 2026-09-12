@@ -15,5 +15,6 @@ func Sources() map[string]FetchFunc {
 		"upwork":    FetchUpwork,
 		"reddit":    FetchReddit,
 		"weblancer": FetchWeblancer,
+		"kwork":     FetchKwork,
 	}
 }
