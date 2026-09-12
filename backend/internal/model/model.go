@@ -26,7 +26,7 @@ type Order struct {
 	Description  string          `json:"description"`
 	BudgetCents  *int            `json:"budget_cents"`
 	Currency     string          `json:"currency"`
-	Skills      []string        `json:"skills"`
+	Skills       []string        `json:"skills"`
 	BranchID     *int64          `json:"branch_id"`
 	Status       string          `json:"status"`
 	FirstSeenAt  time.Time       `json:"first_seen_at"`
@@ -64,6 +64,7 @@ type Listing struct {
 	Currency    string
 	Skills      []string
 	Raw         json.RawMessage
+	PublishedAt *time.Time
 }
 
 // EventPayload — снапшот у events.payload: живе навіть після видалення замовлення.
