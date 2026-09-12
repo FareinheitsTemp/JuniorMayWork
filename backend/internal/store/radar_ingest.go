@@ -7,8 +7,6 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-
-	"github.com/FareinheitsTemp/JuniorMayWork/backend/internal/model"
 )
 
 // FindDuplicateByFingerprint знаходить уже відомий аналог із будь-якого джерела
