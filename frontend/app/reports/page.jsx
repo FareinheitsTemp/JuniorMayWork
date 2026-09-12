@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import StatCard from '@/components/StatCard';
+import { APP_RESULT_LABELS } from '@/lib/status';
 
 function todayStr(offsetDays = 0) {
   const d = new Date();
@@ -149,8 +150,8 @@ export default function ReportsPage() {
                     value={a.result}
                     onChange={(e) => setAppResult(a.id, e.target.value)}
                   >
-                    {['pending', 'accepted', 'declined'].map((r) => (
-                      <option key={r} value={r}>{r}</option>
+                    {Object.entries(APP_RESULT_LABELS).map(([value, label]) => (
+                      <option key={value} value={value}>{label}</option>
                     ))}
                   </select>
                 </td>

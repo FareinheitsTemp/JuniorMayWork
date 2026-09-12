@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
+import { statusLabel } from '@/lib/status';
 
 const STATUSES = ['new', 'seen', 'applied', 'won', 'lost', 'archived'];
 
@@ -77,7 +78,7 @@ export default function OrdersPage() {
           <select id="f-status" className="select" value={status} onChange={(e) => setStatus(e.target.value)}>
             <option value="">усі</option>
             {STATUSES.map((s) => (
-              <option key={s} value={s}>{s}</option>
+              <option key={s} value={s}>{statusLabel(s)}</option>
             ))}
           </select>
         </div>
@@ -146,7 +147,7 @@ export default function OrdersPage() {
                     onChange={(e) => updateOrder(o, { status: e.target.value })}
                   >
                     {STATUSES.map((s) => (
-                      <option key={s} value={s}>{s}</option>
+                      <option key={s} value={s}>{statusLabel(s)}</option>
                     ))}
                   </select>
                 </td>

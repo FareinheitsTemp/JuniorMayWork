@@ -3,13 +3,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { useLive } from '@/lib/useLive';
-
-const TYPE_LABELS = {
-  new: 'нове замовлення',
-  removed: 'видалено з джерела',
-  status_changed: 'зміна статусу',
-  applied: 'заявка подана',
-};
+import { EVENT_LABELS } from '@/lib/status';
 
 function eventTitle(event) {
   const p = event.payload || {};
@@ -46,7 +40,7 @@ export default function EventFeed({ limit = 30 }) {
         {events.map((e) => (
           <li key={e.id || `${e.type}-${e.created_at}`} className="feed__item">
             <span className={`badge badge--${e.type === 'removed' ? 'removed' : e.payload?.status || 'new'}`}>
-              {TYPE_LABELS[e.type] || e.type}
+              {EVENT_LABELS[e.type] || e.type}
             </span>
             <span className="feed__text">{eventTitle(e)}</span>
           </li>

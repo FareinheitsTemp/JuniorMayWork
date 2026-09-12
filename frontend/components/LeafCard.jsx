@@ -1,5 +1,7 @@
 'use client';
 
+import { statusLabel } from '@/lib/status';
+
 function money(cents) {
   if (cents == null) return '—';
   return `$${(cents / 100).toLocaleString('en-US')}`;
@@ -13,7 +15,7 @@ export default function LeafCard({ order, onAction }) {
         <a className="leaf__title" href={order.url} target="_blank" rel="noreferrer">
           {order.title}
         </a>
-        <span className={`badge badge--${order.status}`}>{order.status}</span>
+        <span className={`badge badge--${order.status}`}>{statusLabel(order.status)}</span>
       </div>
       <div className="leaf__meta">
         <span className="leaf__source">{order.source}</span>
