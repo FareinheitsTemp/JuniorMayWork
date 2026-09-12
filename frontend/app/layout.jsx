@@ -1,5 +1,6 @@
 import Nav from '@/components/Nav';
 import '@/styles/globals.scss';
+import '@/styles/blocks/radar.scss';
 
 export const metadata = {
   title: 'JuniorMayWork',
