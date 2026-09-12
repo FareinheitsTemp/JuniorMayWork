@@ -6,6 +6,7 @@ import { useLive } from '@/lib/useLive';
 import StatCard from '@/components/StatCard';
 import TreeView from '@/components/TreeView';
 import EventFeed from '@/components/EventFeed';
+import NewOrderAlert from '@/components/NewOrderAlert';
 
 export default function DashboardPage() {
   const [stats, setStats] = useState(null);
@@ -68,6 +69,7 @@ export default function DashboardPage() {
 
   return (
     <section className="page">
+      <NewOrderAlert />
       <div className="page__row" style={{ justifyContent: 'space-between' }}>
         <h1 className="page__title">Дашборд</h1>
         <button type="button" className="button button--primary" onClick={runNow} disabled={busy}>
