@@ -1,0 +1,57 @@
+.leaf {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--bg-soft);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px;
+}
+
+.leaf__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.leaf__title {
+  color: var(--text);
+  font-weight: 600;
+  font-size: 14px;
+
+  &:hover {
+    color: var(--accent);
+  }
+}
+
+.leaf__meta {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.leaf__budget {
+  color: var(--good);
+  font-weight: 600;
+}
+
+.leaf__skills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.leaf__skill {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 11px;
+  padding: 1px 7px;
+  border-radius: 999px;
+}
+
+.leaf__actions {
+  display: flex;
+  gap: 8px;
+}

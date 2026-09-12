@@ -3,6 +3,8 @@
 
 @use 'blocks/stat';
 @use 'blocks/feed';
+@use 'blocks/tree';
+@use 'blocks/leaf';
 
 :root {
   --bg: #0f131b;
@@ -111,6 +113,23 @@ a {
   gap: 16px;
   flex-wrap: wrap;
   align-items: flex-end;
+}
+
+.dashboard {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 16px;
+  align-items: start;
+
+  @media (max-width: 900px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.dashboard__tree {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .card {
