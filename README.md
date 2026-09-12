@@ -2,18 +2,18 @@
 
 Реальний час — трекер дрібних фриланс-замовлень (React/JavaScript, до $100). Go-скрейпер збирає замовлення з публічних сайтів, складає все в PostgreSQL, а Next.js UI показує їх деревом **вітки (ніші) → листочки (замовлення)** з повним CRUD над БД, заявками, звітами за датами і живим фідом подій по WebSocket. Зниклі або зайняті замовлення виносяться в JSON-архів і видаляються з БД.
 
-## Швидкий старт
+## Швидкий старт (без Docker)
 
-Потрібно: Docker, Go 1.25+, Node.js >= 20.9.
+Потрібно: локальний PostgreSQL 16+, Go 1.25+, Node.js >= 20.9.
 
 ```bash
-# 1. Підняти PostgreSQL 16 (порт 5432)
-docker compose up -d
+# 1. База даних (один раз) — створи порожню базу
+psql -U postgres -c "CREATE DATABASE jmw;"
 
-# 2. Конфіг (за замовчуванням збігається з compose)
+# 2. Конфіг: скопіюй .env.example в .env і впиши свій пароль у JMW_DATABASE_URL
 cp .env.example .env
 
-# 3. Backend: API + WebSocket + скрейпер на :8080
+# 3. Backend: API + WebSocket + скрейпер на :8080 (міграції застосуються самі)
 cd backend
 go mod tidy
 go run ./cmd/jmw
@@ -24,14 +24,14 @@ npm install
 npm run dev
 ```
 
-Міграції застосовуються автоматично при старті бекенду.
+Backend читає конфіг зі змінних оточення (`JMW_*`), дефолти збігаються з `.env.example`.
 
 ## Як це працює
 
-- **Скрейпер** (менеджер у `internal/scraper`) опитує джерела за `JMW_POLL_INTERVAL` (деф. 90s), дифить результат проти БД: нове замовлення → `INSERT` + подія `new` + broadcast у WebSocket; зникле (не було останні 2 вибірки) → JSON-архів `data/archive/orders-YYYY-MM.json` + `DELETE` з БД + подія `removed`.
+- **Скрейпер** (менеджер у `internal/scraper`) опитує джерела за `JMW_POLL_INTERVAL` (деф. 90s), дифить результат проти БД: нове замовлення → `INSERT` + подія `new` + broadcast у WebSocket; зникле (не було останні 2 вибірки) → JSON-архів `data/archive/orders-YYYY-MM.json` + `DELETE` з БД + подія `removed`. Виграні замовлення (`won`) не видаляються.
 - **Вітки** (`branches`) — ваші ніші з ключовими словами та лімітом бюджету. Замовлення класифікується у вітку автоматично за `keywords`.
 - **Статуси замовлення**: `new → seen → applied → won / lost / archived`.
-- **Заявки** (`applications`) — кнопка «подати заявку» фіксує спробу й результат, історія подій показує, куди рухаються реквести.
+- **Заявки** (`applications`) — кнопка «подати заявку» фіксує спробу й результат (`pending / accepted / declined`), історія подій показує, куди рухаються реквести.
 
 ## Джерела
 
@@ -54,6 +54,7 @@ frontend/  Next.js (App Router): app/, components/, lib/, styles/ (SCSS + BEM)
 | PATCH/DELETE | `/api/orders/{id}` | зміна статусу / видалення замовлення |
 | POST | `/api/orders/{id}/apply` | подати заявку |
 | GET | `/api/events` | лента подій |
+| GET | `/api/applications` | історія заявок |
 | GET | `/api/reports/summary` | звіт за діапазоном дат |
 | POST | `/api/scraper/run` | запустити збір негайно |
 | GET | `/ws` | WebSocket: події в реальному часі |
