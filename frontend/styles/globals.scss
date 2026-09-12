@@ -1,0 +1,252 @@
+// JuniorMayWork — базові стилі та спільні BEM-блоки.
+// Блоки компонентів — у styles/blocks/.
+
+@use 'blocks/stat';
+@use 'blocks/feed';
+
+:root {
+  --bg: #0f131b;
+  --bg-soft: #161c28;
+  --card: #1b2332;
+  --card-hover: #212b3d;
+  --line: #2a3548;
+  --text: #e8ecf4;
+  --text-dim: #8f9cb2;
+  --accent: #5b8cff;
+  --accent-soft: rgba(91, 140, 255, 0.15);
+  --good: #3fcf8e;
+  --warn: #ffb547;
+  --bad: #ff6b7a;
+  --radius: 10px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.app__main {
+  flex: 1;
+  width: min(1200px, 100% - 32px);
+  margin: 0 auto;
+  padding: 24px 0 48px;
+}
+
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 0 24px;
+  height: 56px;
+  background: var(--bg-soft);
+  border-bottom: 1px solid var(--line);
+}
+
+.nav__brand {
+  font-weight: 700;
+  font-size: 17px;
+  letter-spacing: 0.2px;
+
+  span {
+    color: var(--accent);
+  }
+}
+
+.nav__links {
+  display: flex;
+  gap: 4px;
+}
+
+.nav__link {
+  padding: 6px 12px;
+  border-radius: 8px;
+  color: var(--text-dim);
+  transition: color 0.15s, background 0.15s;
+
+  &:hover {
+    color: var(--text);
+    background: var(--accent-soft);
+  }
+}
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.page__title {
+  margin: 0;
+  font-size: 24px;
+}
+
+.page__hint {
+  color: var(--text-dim);
+}
+
+.page__row {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-soft);
+  color: var(--text);
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+
+  &:hover {
+    background: var(--card-hover);
+  }
+
+  &--primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+
+    &:hover {
+      background: #4a7cf0;
+    }
+  }
+
+  &--danger {
+    color: var(--bad);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.input,
+.select,
+.textarea {
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-soft);
+  color: var(--text);
+  font: inherit;
+
+  &:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field__label {
+  font-size: 12px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.badge {
+  display: inline-flex;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  background: var(--accent-soft);
+  color: var(--accent);
+
+  &--new {
+    background: rgba(63, 207, 142, 0.15);
+    color: var(--good);
+  }
+
+  &--seen {
+    background: rgba(255, 181, 71, 0.15);
+    color: var(--warn);
+  }
+
+  &--applied {
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+
+  &--won {
+    background: rgba(63, 207, 142, 0.2);
+    color: var(--good);
+  }
+
+  &--lost {
+    background: rgba(255, 107, 122, 0.15);
+    color: var(--bad);
+  }
+
+  &--archived {
+    background: rgba(143, 156, 178, 0.15);
+    color: var(--text-dim);
+  }
+
+  &--removed {
+    background: rgba(255, 107, 122, 0.15);
+    color: var(--bad);
+  }
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+
+  th,
+  td {
+    text-align: left;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  th {
+    color: var(--text-dim);
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+}
