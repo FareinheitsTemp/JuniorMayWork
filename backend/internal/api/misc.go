@@ -101,7 +101,7 @@ func (s *Server) HandleReport(w http.ResponseWriter, r *http.Request) {
 	}
 	if v := q.Get("to"); v != "" {
 		if t, err := time.Parse("2006-01-02", v); err == nil {
-			to = t.Add(24 * time.Hour) // включно
+			to = t.Add(24 * time.Hour)
 		}
 	}
 	rep, err := s.store.ReportSummary(r.Context(), from, to)
@@ -109,7 +109,6 @@ func (s *Server) HandleReport(w http.ResponseWriter, r *http.Request) {
 		writeStoreErr(w, err)
 		return
 	}
-	// попередній період такої самої довжини — щоб було з чим порівнювати
 	prevFrom := from.Add(-(to.Sub(from)))
 	if prev, err := s.store.ReportSummary(r.Context(), prevFrom, from); err == nil {
 		rep.Previous = &prev
@@ -149,11 +148,18 @@ func (s *Server) Routes(allowedOrigin string, wsHandler http.HandlerFunc) http.H
 	mux.HandleFunc("PATCH /api/orders/{id}", s.HandleOrder)
 	mux.HandleFunc("DELETE /api/orders/{id}", s.HandleOrder)
 	mux.HandleFunc("POST /api/orders/{id}/apply", s.HandleApply)
+	mux.HandleFunc("POST /api/orders/{id}/seen", s.HandleOrderSeen)
+	mux.HandleFunc("POST /api/orders/{id}/dismiss", s.HandleOrderDismiss)
 	mux.HandleFunc("GET /api/events", s.HandleEvents)
 	mux.HandleFunc("GET /api/applications", s.HandleApplications)
 	mux.HandleFunc("PATCH /api/applications/{id}", s.HandleApplication)
 	mux.HandleFunc("GET /api/stats", s.HandleStats)
 	mux.HandleFunc("GET /api/reports/summary", s.HandleReport)
+	mux.HandleFunc("GET /api/radar/fresh-orders", s.HandleFreshOrders)
+	mux.HandleFunc("GET /api/radar/runs", s.HandleRadarRuns)
+	mux.HandleFunc("GET /api/schema/layout", s.HandleSchemaLayout)
+	mux.HandleFunc("PATCH /api/schema/layout", s.HandleSchemaLayout)
+	mux.HandleFunc("PATCH /api/schema/nodes/{id}", s.HandleSchemaNode)
 	mux.HandleFunc("POST /api/scraper/run", s.HandleScraperRun)
 	mux.HandleFunc("GET /api/scraper/status", s.HandleScraperStatus)
 	mux.HandleFunc("GET /api/healthz", func(w http.ResponseWriter, r *http.Request) {
