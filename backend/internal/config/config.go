@@ -37,7 +37,7 @@ func Load() Config {
 	if err != nil {
 		port = 5433
 	}
-	srcs := strings.Split(get("JMW_SOURCES", "upwork,reddit,weblancer,kwork"), ",")
+	srcs := strings.Split(get("JMW_SOURCES", "telegram,freelancehunt,weblancer"), ",")
 	sources := make([]string, 0, len(srcs))
 	for _, s := range srcs {
 		if s = strings.TrimSpace(strings.ToLower(s)); s != "" {
