@@ -3,12 +3,17 @@ package config
 
 import (
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
 
 type Config struct {
+	// DatabaseURL: порожня => база вбудована (embedded-postgres).
+	// Встанови JMW_DATABASE_URL, щоб ходити у зовнішній PostgreSQL.
 	DatabaseURL   string
+	EmbeddedPort  uint
+	DataDir       string
 	Addr          string
 	AllowedOrigin string
 	PollInterval  time.Duration
@@ -28,7 +33,11 @@ func Load() Config {
 	if err != nil || interval <= 0 {
 		interval = 90 * time.Second
 	}
-	srcs := strings.Split(get("JMW_SOURCES", "upwork,reddit,weblancer"), ",")
+	port, err := strconv.ParseUint(get("JMW_EMBEDDED_PORT", "5433"), 10, 16)
+	if err != nil {
+		port = 5433
+	}
+	srcs := strings.Split(get("JMW_SOURCES", "upwork,reddit,weblancer,kwork"), ",")
 	sources := make([]string, 0, len(srcs))
 	for _, s := range srcs {
 		if s = strings.TrimSpace(strings.ToLower(s)); s != "" {
@@ -36,7 +45,9 @@ func Load() Config {
 		}
 	}
 	return Config{
-		DatabaseURL:   get("JMW_DATABASE_URL", "postgres://jmw:jmw@localhost:5432/jmw"),
+		DatabaseURL:   get("JMW_DATABASE_URL", ""),
+		EmbeddedPort:  uint(port),
+		DataDir:       get("JMW_DATA_DIR", "./data"),
 		Addr:          get("JMW_ADDR", ":8080"),
 		AllowedOrigin: get("JMW_ALLOWED_ORIGIN", "http://localhost:3000"),
 		PollInterval:  interval,

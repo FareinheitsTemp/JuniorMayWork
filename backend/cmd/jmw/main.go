@@ -1,4 +1,5 @@
 // JuniorMayWork — точка входу бекенду: API + WebSocket + скрейпер.
+// База: вбудований PostgreSQL за замовчуванням (зовнішня — через JMW_DATABASE_URL).
 package main
 
 import (
@@ -26,6 +27,18 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	// База даних: зовнішній PostgreSQL або вбудований (нічого ставити не треба).
+	if cfg.DatabaseURL == "" {
+		dbURL, stopDB, err := db.StartEmbedded(cfg.DataDir, cfg.EmbeddedPort)
+		if err != nil {
+			log.Error("вбудована база не піднялась", "err", err)
+			os.Exit(1)
+		}
+		defer stopDB()
+		cfg.DatabaseURL = dbURL
+		log.Info("вбудований PostgreSQL працює", "url", dbURL)
+	}
 
 	pool, err := db.Connect(ctx, cfg.DatabaseURL)
 	if err != nil {

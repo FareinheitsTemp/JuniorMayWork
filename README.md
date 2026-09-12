@@ -2,29 +2,32 @@
 
 Реальний час — трекер дрібних фриланс-замовлень (React/JavaScript, до $100). Go-скрейпер збирає замовлення з публічних сайтів, складає все в PostgreSQL, а Next.js UI показує їх деревом **вітки (ніші) → листочки (замовлення)** з повним CRUD над БД, заявками, звітами за датами і живим фідом подій по WebSocket. Зниклі або забрані замовлення виносяться в JSON-архів і видаляються з БД.
 
-## Швидкий старт (без Docker)
+## Швидкий старт
 
-Потрібно: локальний PostgreSQL 16+, Go 1.25+, Node.js >= 20.9.
+Потрібно лише: **Go 1.25+** і **Node.js >= 20.9**. PostgreSQL ставити не треба — бекенд піднімає вбудований сам.
 
 ```bash
-# 1. База даних (один раз) — створи порожню базу
-psql -U postgres -c "CREATE DATABASE jmw;"
-
-# 2. Конфіг: скопіюй .env.example в .env і впиши свій пароль у JMW_DATABASE_URL
-cp .env.example .env
-
-# 3. Backend: API + WebSocket + скрейпер на :8080 (міграції застосуються самі)
+# 1. Backend: вбудований PostgreSQL + API + WebSocket + скрейпер на :8080
 cd backend
 go mod tidy
 go run ./cmd/jmw
 
-# 4. Frontend: UI на http://localhost:3000
+# 2. Frontend: UI на http://localhost:3000
 cd frontend
 npm install
 npm run dev
 ```
 
-Backend читає конфіг зі змінних оточення (`JMW_*`), дефолти збігаються з `.env.example`. У PowerShell змінні задаються так: `$env:JMW_DATABASE_URL="postgres://postgres:ПАРОЛЬ@localhost:5432/jmw"`.
+Перший запуск бекенда завантажить бінарники вбудованого PostgreSQL (~40МБ) — далі старт миттєвий. База живе в `backend/data/pg` (каталог у `.gitignore`).
+
+### Зовнішня база (опція)
+
+Хочеш повноцінний PostgreSQL окремо — задай `JMW_DATABASE_URL`, наприклад:
+
+```bash
+set JMW_DATABASE_URL=postgres://postgres:ПАРОЛЬ@localhost:5432/jmw
+go run ./cmd/jmw
+```
 
 ## Як це працює
 
@@ -32,13 +35,13 @@ Backend читає конфіг зі змінних оточення (`JMW_*`), 
 - **Вітки** (`branches`) — ваші ніші з ключовими словами та лімітом бюджету. Замовлення класифікується у вітку автоматично: найбільший збіг keywords за title+description, бюджет вкладається в ліміт.
 - **Статуси замовлення**: `new → seen → applied → won / lost / archived`.
 - **Заявки** (`applications`) — кнопка «подати заявку» фіксує спробу й результат (`pending / accepted / declined`), історія — на сторінці «Звіти» + живий фід показує, куди рухаються реквести.
-- **Події WebSocket** несуть бюджет замовлення (`payload.budget_cents`), тож фронт одразу бачить суму.
+- **Події WebSocket** несуть бюджет замовлення (`payload.budget_cents`), тож фронт одразу бачить суму; на гігі до $50 — тост + звук.
 
 ## Сторінки UI
 
 | Сторінка | Що там |
 |---|---|
-| `/` | Дашборд: статистика, дерево вітка→листочок, живий фід подій |
+| `/` | Дашборд: статистика, дерево вітка→листочок, живий фід подій, тости |
 | `/orders` | Усі замовлення: фільтри (статус/вітка/пошук), зміна статусу і вітки, заявка, видалення |
 | `/branches` | CRUD віток: назва, ключові слова, ліміт бюджету, активність |
 | `/reports` | Звіти за діапазоном дат: бари по вітках/джерелах/днях, історія заявок з результатами, експорт CSV |
@@ -59,9 +62,9 @@ Backend читає конфіг зі змінних оточення (`JMW_*`), 
 
 ```
 backend/
-  cmd/jmw/main.go            точка входу (API + WS + скрейпер у фоні)
+  cmd/jmw/main.go            точка входу (вбудована БД + API + WS + скрейпер)
   internal/config            env-конфіг з дефолтами
-  internal/db                пул pgx + ранер міграцій
+  internal/db                вбудований PostgreSQL, пул pgx, ранер міграцій
   internal/model             Branch/Order/Event/Application/Listing
   internal/store             усі SQL-запити (параметризовані)
   internal/scraper           менеджер: poll → diff → класифікація → архівація
@@ -70,11 +73,12 @@ backend/
   internal/ws                WebSocket-хаб
   internal/api               REST-хендлери, маршрути, CORS
   migrations/                SQL-міграції (вбудовані в бінарник)
+  data/                      вбудована БД (pg) і JSON-архів (archive) — у .gitignore
 frontend/
   app/                       сторінки Next.js (App Router)
-  components/                TreeView, LeafCard, EventFeed, StatCard
+  components/                TreeView, LeafCard, EventFeed, StatCard, NewOrderAlert
   lib/                       api-клієнт і useLive (WebSocket-хук)
-  styles/                   globals.scss + BEM-блоки
+  styles/                    globals.scss + BEM-блоки
 ```
 
 ## API (коротко)
@@ -96,6 +100,7 @@ frontend/
 
 ## Дані і архів
 
-- Усе, що назбирається, живе в PostgreSQL (таблиці `branches`, `orders`, `events`, `applications`).
-- Замовлення, зникле з джерела, перед видаленням із БД повністю (з `raw`-снапшотом) пишеться в `backend/data/archive/orders-YYYY-MM.json` — цей каталог у `.gitignore`.
+- Усе, що назбирається, живе в PostgreSQL (таблиці `branches`, `orders`, `events`, `applications`) — за замовчуванням у вбудованій базі в `backend/data/pg`.
+- Замовлення, зникле з джерела, перед видаленням із БД повністю (з `raw`-снапшотом) пишеться в `backend/data/archive/orders-YYYY-MM.json`.
 - Історія подій (`events`) зберігає снапшот замовлення у `payload`, тому живе й після видалення рядка з `orders`.
+- Бекап усього стану = скопіювати папку `backend/data`.

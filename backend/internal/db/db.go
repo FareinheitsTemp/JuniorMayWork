@@ -1,17 +1,39 @@
-// Пакет db: підключення до PostgreSQL і прогін вбудованих міграцій.
+// Пакет db: підключення до PostgreSQL (вбудований або зовнішній) і міграції.
 package db
 
 import (
 	"context"
 	"fmt"
 	"io/fs"
+	"path/filepath"
 	"sort"
 	"time"
 
+	embeddedpostgres "github.com/fergusstrange/embedded-postgres"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/FareinheitsTemp/JuniorMayWork/backend/migrations"
 )
+
+// StartEmbedded піднімає вбудований PostgreSQL у dataDir/pg.
+// Перший запуск завантажує бінарники (~40МБ), далі — стартує миттєво.
+// Повертає рядок підключення і функцію зупинки.
+func StartEmbedded(dataDir string, port uint) (string, func(), error) {
+	pg := embeddedpostgres.NewDatabase(
+		embeddedpostgres.DefaultConfig().
+			Version(embeddedpostgres.V18).
+			Port(uint32(port)).
+			DataPath(filepath.Join(dataDir, "pg")).
+			Username("jmw").
+			Password("jmw").
+			Database("jmw"),
+	)
+	if err := pg.Start(); err != nil {
+		return "", nil, fmt.Errorf("embedded postgres: %w", err)
+	}
+	url := fmt.Sprintf("postgres://jmw:jmw@localhost:%d/jmw", port)
+	return url, func() { _ = pg.Stop() }, nil
+}
 
 // Connect створює пул з'єднань і перевіряє доступність БД.
 func Connect(ctx context.Context, url string) (*pgxpool.Pool, error) {
@@ -24,7 +46,7 @@ func Connect(ctx context.Context, url string) (*pgxpool.Pool, error) {
 	if err != nil {
 		return nil, err
 	}
-	pingCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	pingCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 	if err := pool.Ping(pingCtx); err != nil {
 		pool.Close()
