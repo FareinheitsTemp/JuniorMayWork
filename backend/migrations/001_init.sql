@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS orders (
   title         TEXT NOT NULL,
   description   TEXT NOT NULL DEFAULT '',
   budget_cents  INTEGER,
-  currency      TEXT NOT NULL DEFAULT 'USD',
+  currency       TEXT NOT NULL DEFAULT 'USD',
   skills        TEXT[] NOT NULL DEFAULT '{}',
   branch_id     INTEGER REFERENCES branches(id) ON DELETE SET NULL,
   status        TEXT NOT NULL DEFAULT 'new'
@@ -42,17 +42,20 @@ CREATE TABLE IF NOT EXISTS events (
 );
 
 -- Заявки: "беру це замовлення" + результат.
+-- order_id ON DELETE SET NULL + order_title: історія заявок живе
+-- і після видалення замовлення з БД.
 CREATE TABLE IF NOT EXISTS applications (
-  id         SERIAL PRIMARY KEY,
-  order_id   INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
-  note       TEXT NOT NULL DEFAULT '',
-  result     TEXT NOT NULL DEFAULT 'pending'
-             CHECK (result IN ('pending','accepted','declined')),
-  applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  id          SERIAL PRIMARY KEY,
+  order_id    INTEGER REFERENCES orders(id) ON DELETE SET NULL,
+  order_title TEXT NOT NULL DEFAULT '',
+  note        TEXT NOT NULL DEFAULT '',
+  result      TEXT NOT NULL DEFAULT 'pending'
+              CHECK (result IN ('pending','accepted','declined')),
+  applied_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_orders_branch   ON orders(branch_id);
-CREATE INDEX IF NOT EXISTS idx_orders_status   ON orders(status);
+CREATE INDEX IF NOT EXISTS idx_orders_branch     ON orders(branch_id);
+CREATE INDEX IF NOT EXISTS idx_orders_status     ON orders(status);
 CREATE INDEX IF NOT EXISTS idx_orders_first_seen ON orders(first_seen_at DESC);
-CREATE INDEX IF NOT EXISTS idx_events_created  ON events(created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_apps_order      ON applications(order_id);
+CREATE INDEX IF NOT EXISTS idx_events_created    ON events(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_apps_order        ON applications(order_id);
