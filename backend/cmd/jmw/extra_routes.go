@@ -2,7 +2,7 @@ package main
 
 import (
 	"net/http"
-	""strings"
+	"strings"
 
 	"github.com/FareinheitsTemp/JuniorMayWork/backend/internal/api"
 )
