@@ -16,15 +16,10 @@ func (s *Server) HandleEvents(w http.ResponseWriter, r *http.Request) {
 	}
 	limit := 100
 	if v := r.URL.Query().Get("limit"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			limit = n
-		}
+		if n, err := strconv.Atoi(v); err == nil { limit = n }
 	}
 	list, err := s.store.ListEvents(r.Context(), limit)
-	if err != nil {
-		writeStoreErr(w, err)
-		return
-	}
+	if err != nil { writeStoreErr(w, err); return }
 	writeJSON(w, http.StatusOK, list)
 }
 
@@ -36,32 +31,22 @@ func (s *Server) HandleApplications(w http.ResponseWriter, r *http.Request) {
 	}
 	limit := 100
 	if v := r.URL.Query().Get("limit"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			limit = n
-		}
+		if n, err := strconv.Atoi(v); err == nil { limit = n }
 	}
 	list, err := s.store.ListApplications(r.Context(), limit)
-	if err != nil {
-		writeStoreErr(w, err)
-		return
-	}
+	if err != nil { writeStoreErr(w, err); return }
 	writeJSON(w, http.StatusOK, list)
 }
 
 func (s *Server) HandleApplication(w http.ResponseWriter, r *http.Request) {
 	id, err := pathID(r)
-	if err != nil {
-		writeErr(w, http.StatusBadRequest, "некоректний id")
-		return
-	}
+	if err != nil { writeErr(w, http.StatusBadRequest, "некоректний id"); return }
 	if r.Method != http.MethodPatch {
 		w.Header().Set("Allow", "PATCH")
 		writeErr(w, http.StatusMethodNotAllowed, "метод не підтримується")
 		return
 	}
-	var body struct {
-		Result string `json:"result"`
-	}
+	var body struct { Result string `json:"result"` }
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeErr(w, http.StatusBadRequest, "некоректний JSON")
 		return
@@ -73,46 +58,30 @@ func (s *Server) HandleApplication(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	app, err := s.store.SetApplicationResult(r.Context(), id, body.Result)
-	if err != nil {
-		writeStoreErr(w, err)
-		return
-	}
+	if err != nil { writeStoreErr(w, err); return }
 	writeJSON(w, http.StatusOK, app)
 }
 
 func (s *Server) HandleStats(w http.ResponseWriter, r *http.Request) {
 	st, err := s.store.Stats(r.Context())
-	if err != nil {
-		writeStoreErr(w, err)
-		return
-	}
+	if err != nil { writeStoreErr(w, err); return }
 	writeJSON(w, http.StatusOK, st)
 }
 
 func (s *Server) HandleReport(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
-	from := now.AddDate(0, 0, -30)
-	to := now
+	from, to := now.AddDate(0, 0, -30), now
 	q := r.URL.Query()
 	if v := q.Get("from"); v != "" {
-		if t, err := time.Parse("2006-01-02", v); err == nil {
-			from = t
-		}
+		if t, err := time.Parse("2006-01-02", v); err == nil { from = t }
 	}
 	if v := q.Get("to"); v != "" {
-		if t, err := time.Parse("2006-01-02", v); err == nil {
-			to = t.Add(24 * time.Hour)
-		}
+		if t, err := time.Parse("2006-01-02", v); err == nil { to = t.Add(24 * time.Hour) }
 	}
 	rep, err := s.store.ReportSummary(r.Context(), from, to)
-	if err != nil {
-		writeStoreErr(w, err)
-		return
-	}
+	if err != nil { writeStoreErr(w, err); return }
 	prevFrom := from.Add(-(to.Sub(from)))
-	if prev, err := s.store.ReportSummary(r.Context(), prevFrom, from); err == nil {
-		rep.Previous = &prev
-	}
+	if prev, err := s.store.ReportSummary(r.Context(), prevFrom, from); err == nil { rep.Previous = &prev }
 	writeJSON(w, http.StatusOK, rep)
 }
 
@@ -160,14 +129,15 @@ func (s *Server) Routes(allowedOrigin string, wsHandler http.HandlerFunc) http.H
 	mux.HandleFunc("GET /api/schema/layout", s.HandleSchemaLayout)
 	mux.HandleFunc("PATCH /api/schema/layout", s.HandleSchemaLayout)
 	mux.HandleFunc("PATCH /api/schema/nodes/{id}", s.HandleSchemaNode)
+	mux.HandleFunc("GET /api/search-profiles", s.HandleSearchProfiles)
+	mux.HandleFunc("POST /api/search-profiles", s.HandleSearchProfiles)
+	mux.HandleFunc("GET /api/search-profiles/{id}", s.HandleSearchProfile)
+	mux.HandleFunc("PATCH /api/search-profiles/{id}", s.HandleSearchProfile)
+	mux.HandleFunc("DELETE /api/search-profiles/{id}", s.HandleSearchProfile)
 	mux.HandleFunc("POST /api/scraper/run", s.HandleScraperRun)
 	mux.HandleFunc("GET /api/scraper/status", s.HandleScraperStatus)
-	mux.HandleFunc("GET /api/healthz", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
-	})
-	if wsHandler != nil {
-		mux.HandleFunc("GET /ws", wsHandler)
-	}
+	mux.HandleFunc("GET /api/healthz", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, http.StatusOK, map[string]string{"status": "ok"}) })
+	if wsHandler != nil { mux.HandleFunc("GET /ws", wsHandler) }
 	return cors(allowedOrigin, mux)
 }
 
@@ -176,10 +146,7 @@ func cors(allowedOrigin string, next http.Handler) http.Handler {
 		w.Header().Set("Access-Control-Allow-Origin", allowedOrigin)
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-		if r.Method == http.MethodOptions {
-			w.WriteHeader(http.StatusNoContent)
-			return
-		}
+		if r.Method == http.MethodOptions { w.WriteHeader(http.StatusNoContent); return }
 		next.ServeHTTP(w, r)
 	})
 }
