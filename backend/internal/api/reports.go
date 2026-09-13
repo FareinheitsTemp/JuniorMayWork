@@ -64,7 +64,7 @@ func (s *Server) HandleRunReportCreate(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, map[string]any{
 		"id":           reportID,
 		"file_name":    fileName,
-		""orders_total": len(report.Jobs),
+		"orders_total": len(report.Jobs),
 		"download":     fmt.Sprintf("/api/reports/%d/download", reportID),
 	})
 }
