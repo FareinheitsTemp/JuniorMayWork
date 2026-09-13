@@ -32,17 +32,15 @@ func main() {
 	if cfg.DatabaseURL == "" {
 		dbURL, stopDB, err := db.StartEmbedded(cfg.DataDir, cfg.EmbeddedPort)
 		if err != nil {
-			log.Error("вбудована база не піднялась", "err", err)
+			log.Error("embedded postgres", "err", err)
 			os.Exit(1)
 		}
 		defer stopDB()
 		cfg.DatabaseURL = dbURL
-		log.Info("вбудований PostgreSQL працює", "url", dbURL)
 	}
-
 	pool, err := db.Connect(ctx, cfg.DatabaseURL)
 	if err != nil {
-		log.Error("база даних недоступна", "err", err)
+		log.Error("підключення до БД", "err", err)
 		os.Exit(1)
 	}
 	defer pool.Close()
@@ -68,7 +66,7 @@ func main() {
 
 	httpSrv := &http.Server{
 		Addr:              cfg.Addr,
-		Handler:           server.Routes(cfg.AllowedOrigin, hub.Handler()),
+		Handler:           extraRoutes(server, cfg.AllowedOrigin, hub.Handler()),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
