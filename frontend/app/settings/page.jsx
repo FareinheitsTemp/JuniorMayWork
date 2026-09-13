@@ -1,41 +1,58 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/api';
+import { radar } from '@/lib/radar';
 import { useLive } from '@/lib/useLive';
-import StatCard from '@/components/StatCard';
 
-// Налаштування: стан скрейпера, ручний запуск, шпаргалка конфігу.
+const OUTCOME = {
+  success: { label: 'працює', cls: 'success' },
+  failure: { label: 'помилка', cls: 'failure' },
+  warning: { label: 'частково', cls: 'warning' },
+  running: { label: 'виконується', cls: 'running' },
+};
+
+function ago(value) {
+  if (!value) return '—';
+  const minutes = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 60000));
+  if (minutes < 1) return 'щойно';
+  if (minutes < 60) return `${minutes} хв тому`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} год тому`;
+  return `${Math.floor(hours / 24)} дн тому`;
+}
+
 export default function SettingsPage() {
-  const [status, setStatus] = useState(null);
+  const [runs, setRuns] = useState([]);
   const [busy, setBusy] = useState(false);
   const [flash, setFlash] = useState('');
+  const [error, setError] = useState('');
 
   const load = useCallback(async () => {
     try {
-      setStatus(await api.scraperStatus());
+      setRuns(await radar.runs(60));
+      setError('');
     } catch (e) {
-      setFlash(`Помилка: ${e.message}`);
+      setError(e.message);
     }
   }, []);
 
   useEffect(() => {
     load();
-    const timer = setInterval(load, 10000);
+    const timer = setInterval(load, 30000);
     return () => clearInterval(timer);
   }, [load]);
 
-  // будь-яка подія — привід освіжити статус
-  useLive(() => {
-    load();
+  useLive((event) => {
+    if (event.type === 'new') load();
   });
 
-  async function run() {
+  async function runNow() {
     setBusy(true);
     try {
       await api.scraperRun();
       setFlash('Збір запущено');
-      setTimeout(load, 1500);
+      setTimeout(load, 4000);
     } catch (e) {
       setFlash(`Помилка: ${e.message}`);
     } finally {
@@ -43,48 +60,84 @@ export default function SettingsPage() {
     }
   }
 
+  const sources = useMemo(() => {
+    const map = new Map();
+    for (const run of runs || []) {
+      if (!map.has(run.source_id)) map.set(run.source_id, []);
+      map.get(run.source_id).push(run);
+    }
+    return [...map.entries()].map(([id, list]) => ({
+      id,
+      last: list[0],
+      total: list.length,
+      failures: list.filter((r) => r.outcome === 'failure').length,
+      discovered: list.reduce((s, r) => s + (r.discovered_count || 0), 0),
+      inserted: list.reduce((s, r) => s + (r.inserted_count || 0), 0),
+    }));
+  }, [runs]);
+
   return (
     <section className="page">
-      <h1 className="page__title">Налаштування</h1>
-      {flash && <div className="page__hint">{flash}</div>}
-
-      <div className="card">
-        <h2 className="feed__title">Скрейпер</h2>
-        <div className="page__row">
-          <StatCard label="Стан" value={status?.running ? 'працює' : 'чекає'} />
-          <StatCard
-            label="Останній збір"
-            value={status?.last_run ? new Date(status.last_run).toLocaleString('uk-UA') : '—'}
-          />
-          <StatCard
-            label="Наступний"
-            value={status?.next_run ? new Date(status.next_run).toLocaleString('uk-UA') : '—'}
-          />
-          <StatCard label="Інтервал" value={status?.interval ?? '—'} />
+      <div className="page__row" style={{ justifyContent: 'space-between' }}>
+        <div>
+          <h1 className="page__title">Джерела та збір</h1>
+          <p className="page__subtitle">Health джерел, запуск збору та керування каналами</p>
         </div>
-        <div className="page__row">
-          <span className="page__hint">
-            Джерела: {(status?.sources || []).join(', ') || '—'}
-          </span>
-          <button type="button" className="button button--primary" onClick={run} disabled={busy}>
+        <div className="sources__actions">
+          <button type="button" className="button" onClick={load}>Оновити</button>
+          <button type="button" className="button button--primary" onClick={runNow} disabled={busy}>
             {busy ? 'Запускаю…' : 'Зібрати зараз'}
           </button>
         </div>
       </div>
 
-      <div className="card">
-        <h2 className="feed__title">Конфігурація (змінні оточення бекенду)</h2>
-        <ul className="page__hint">
-          <li><code>JMW_DATABASE_URL</code> — рядок підключення до PostgreSQL</li>
-          <li><code>JMW_POLL_INTERVAL</code> — інтервал опитування джерел (дефолт 90s)</li>
-          <li><code>JMW_SOURCES</code> — джерела через кому (upwork, reddit, weblancer)</li>
-          <li><code>JMW_ARCHIVE_DIR</code> — каталог JSON-архіву зниклих замовлень</li>
-        </ul>
+      {flash && <div className="page__hint">{flash}</div>}
+      {error && <div className="inbox__error">{error}</div>}
+
+      <section className="card sources">
+        <h2 className="feed__title">Стан джерел</h2>
+        {sources.length === 0 && <p className="page__hint">Ще немає запусків — натисни «Зібрати зараз».</p>}
+        {sources.length > 0 && (
+          <table className="sources__table">
+            <thead>
+              <tr>
+                <th>Джерело</th>
+                <th>Статус</th>
+                <th>Останній запуск</th>
+                <th>Запусків</th>
+                <th>Знайдено</th>
+                <th>Нових</th>
+                <th>Помилок</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sources.map((s) => {
+                const outcome = OUTCOME[s.last.outcome] || { label: s.last.outcome || '—', cls: 'warning' };
+                const when = s.last.started_at || s.last.created_at || s.last.finished_at;
+                return (
+                  <tr key={s.id}>
+                    <td className="sources__name">source #{s.id}</td>
+                    <td><span className={`sources__badge sources__badge--${outcome.cls}`}>{outcome.label}</span></td>
+                    <td>{ago(when)}</td>
+                    <td>{s.total}</td>
+                    <td>{s.discovered}</td>
+                    <td>{s.inserted}</td>
+                    <td>{s.failures > 0 ? s.failures : '—'}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </section>
+
+      <section className="card sources">
+        <h2 className="feed__title">Канали Telegram</h2>
         <p className="page__hint">
-          Зміни конфігу вступають у силу після перезапуску бекенду. Якщо Weblancer змінив верстку —
-          підкоригуй селектори в backend/internal/scraper/sources/weblancer.go.
+          Додавання й вимикання каналів з’явиться наступним комітом: потрібен CRUD на бекенді,
+          щоб список жив у базі, а не в <code>.env</code>.
         </p>
-      </div>
+      </section>
     </section>
   );
 }
