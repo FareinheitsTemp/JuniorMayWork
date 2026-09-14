@@ -1,222 +1,207 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { api } from '@/lib/api';
 import StatCard from '@/components/StatCard';
 import Donut from '@/components/Donut';
-import { APP_RESULT_LABELS, statusLabel } from '@/lib/status';
 
-const STATUS_COLORS = {
-  new: '#3fcf8e',
-  seen: '#ffb547',
-  applied: '#5b8cff',
-  won: '#2ea87a',
-  lost: '#ff6b7a',
-  archived: '#8f9cb2',
+const RUN_STATUS_LABELS = {
+  queued: 'у черзі',
+  running: 'виконується',
+  completed: 'завершено',
+  partial: 'частково',
+  failed: 'помилка',
 };
 
-function todayStr(offsetDays = 0) {
-  const d = new Date();
-  d.setDate(d.getDate() + offsetDays);
-  return d.toISOString().slice(0, 10);
+const RUN_STATUS_COLORS = {
+  queued: '#8b95a8',
+  running: '#d29922',
+  completed: '#3fb950',
+  partial: '#a371f7',
+  failed: '#f85149',
+};
+
+async function request(path, options = {}) {
+  const res = await fetch(`/api${path}`, {
+    headers: { 'Content-Type': 'application/json' },
+    ...options,
+  });
+  if (!res.ok) {
+    let message = `HTTP ${res.status}`;
+    try {
+      const body = await res.json();
+      if (body && body.error) message = body.error;
+    } catch {}
+    throw new Error(message);
+  }
+  return res.json();
 }
 
-function money(cents) {
-  if (cents == null) return '—';
-  return `$${(cents / 100).toFixed(0)}`;
+function formatDate(value) {
+  if (!value) return '—';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString('uk-UA');
 }
 
-function delta(current, previous) {
-  if (previous == null || previous === 0) return null;
-  return Math.round(((current - previous) / previous) * 100);
-}
-
-// BarChart: горизонтальні CSS-бари (без бібліотек).
-function BarChart({ title, rows }) {
-  const max = Math.max(1, ...rows.map((r) => r.count));
-  return (
-    <div className="chart card">
-      <h2 className="feed__title">{title}</h2>
-      <div className="chart__list">
-        {rows.length === 0 && <div className="page__hint">немає даних за період</div>}
-        {rows.map((r) => {
-          const label = r.name ?? r.day ?? r.source ?? '—';
-          return (
-            <div key={String(label)} className="chart__row">
-              <span className="chart__label">{label}</span>
-              <div className="chart__bar-track">
-                <div className="chart__bar" style={{ width: `${(r.count / max) * 100}%` }} />
-              </div>
-              <span className="chart__count">{r.count}</span>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// Звіти: період + порівняння з попереднім + заявки з результатами + CSV.
 export default function ReportsPage() {
-  const [from, setFrom] = useState(todayStr(-30));
-  const [to, setTo] = useState(todayStr());
-  const [report, setReport] = useState(null);
-  const [apps, setApps] = useState([]);
-  const [flash, setFlash] = useState('');
+  const [summary, setSummary] = useState(null);
+  const [runs, setRuns] = useState([]);
+  const [reports, setReports] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [busyRun, setBusyRun] = useState(null);
+  const [lastReport, setLastReport] = useState(null);
 
   const load = useCallback(async () => {
     try {
-      const [rep, applications] = await Promise.all([
-        api.report(from, to),
-        api.applications(200),
+      const [summaryData, runsData, reportsData] = await Promise.all([
+        request('/reports/summary'),
+        request('/grid/search_runs?limit=50'),
+        request('/grid/reports?limit=50'),
       ]);
-      setReport(rep);
-      setApps(applications || []);
-    } catch (e) {
-      setFlash(`Помилка: ${e.message}`);
+      setSummary(summaryData);
+      setRuns(runsData.rows || []);
+      setReports(reportsData.rows || []);
+      setError('');
+    } catch (err) {
+      setError(`Дані недоступні: ${err.message}`);
+    } finally {
+      setLoading(false);
     }
-  }, [from, to]);
+  }, []);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  async function setAppResult(id, result) {
+  async function generatePDF(run) {
+    setBusyRun(run.id);
+    setLastReport(null);
     try {
-      await api.setApplicationResult(id, result);
+      const data = await request(`/runs/${run.id}/report`, { method: 'POST' });
+      setLastReport(data);
       await load();
-    } catch (e) {
-      setFlash(`Помилка: ${e.message}`);
+    } catch (err) {
+      setError(`Не вдалося згенерувати PDF: ${err.message}`);
+    } finally {
+      setBusyRun(null);
     }
   }
 
-  function exportCsv() {
-    if (!report) return;
-    const lines = [
-      'metric,key,count',
-      `total,orders,${report.total_orders}`,
-      `total,removed,${report.removed}`,
-      `total,applications,${report.applications}`,
-      ...(report.by_branch || []).map((r) => `branch,${JSON.stringify(r.name)},${r.count}`),
-      ...(report.by_source || []).map((r) => `source,${r.source},${r.count}`),
-      ...(report.by_status || []).map((r) => `status,${r.status},${r.count}`),
-      ...(report.daily || []).map((r) => `day,${r.day},${r.count}`),
-    ];
-    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `jmw-report-${from}_${to}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
+  const statusParts = Object.entries(RUN_STATUS_LABELS)
+    .map(([key, label]) => ({
+      label,
+      value: runs.filter((run) => run.status === key).length,
+      color: RUN_STATUS_COLORS[key],
+    }))
+    .filter((part) => part.value > 0);
 
-  const prev = report?.previous;
-  const donutParts = (report?.by_status || []).map((s) => ({
-    label: statusLabel(s.status),
-    value: s.count,
-    color: STATUS_COLORS[s.status] || '#8f9cb2',
-  }));
+  const th = { textAlign: 'left', padding: '8px 10px', borderBottom: '1px solid #e3e7ee', fontSize: 13, color: '#5a6474' };
+  const td = { padding: '8px 10px', borderBottom: '1px solid #eef1f5', fontSize: 13 };
 
   return (
-    <section className="page">
-      <div className="page__row" style={{ justifyContent: 'space-between' }}>
-        <h1 className="page__title">Звіти</h1>
-        <button type="button" className="button" onClick={exportCsv}>
-          Експорт CSV
-        </button>
+    <div className='reports'>
+      <div className='db__head'>
+        <h1 className='page__title'>Звіти</h1>
+        <p className='page__subtitle'>Зведення по замовленнях та PDF-звіти прогонів пошуку.</p>
       </div>
-      {flash && <div className="page__hint">{flash}</div>}
 
-      <div className="page__row">
-        <div className="field">
-          <label className="field__label" htmlFor="r-from">З дати</label>
-          <input id="r-from" type="date" className="input" value={from} onChange={(e) => setFrom(e.target.value)} />
+      {error && <p style={{ color: '#f85149' }}>{error}</p>}
+
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center', marginBottom: 20 }}>
+        <StatCard label='Замовлень усього' value={summary ? (summary.total_orders ?? '—') : '…'} />
+        <StatCard label='Прогонів пошуку' value={runs.length} />
+        <StatCard label='PDF-звітів' value={reports.length} />
+        {statusParts.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <Donut parts={statusParts} size={120} />
+            <div style={{ fontSize: 12, color: '#5a6474' }}>
+              {statusParts.map((part) => (
+                <div key={part.label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: 4, background: part.color, display: 'inline-block' }} />
+                  {part.label}: {part.value}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {lastReport && (
+        <div style={{ background: '#eaf6ec', border: '1px solid #bfe3c6', borderRadius: 8, padding: '10px 14px', marginBottom: 18, display: 'flex', alignItems: 'center', gap: 10 }}>
+          <strong>PDF готовий:</strong> {lastReport.file_name}
+          <a className='button' style={{ textDecoration: 'none' }} href={lastReport.download}>Завантажити</a>
         </div>
-        <div className="field">
-          <label className="field__label" htmlFor="r-to">По дату</label>
-          <input id="r-to" type="date" className="input" value={to} onChange={(e) => setTo(e.target.value)} />
-        </div>
-      </div>
+      )}
 
-      <div className="page__row">
-        <StatCard
-          label="Замовлень"
-          value={report?.total_orders ?? '—'}
-          delta={report && prev ? delta(report.total_orders, prev.total_orders) : null}
-          hint={prev ? `попередній період: ${prev.total_orders}` : undefined}
-        />
-        <StatCard
-          label="Зникло (архів)"
-          value={report?.removed ?? '—'}
-          delta={report && prev ? delta(report.removed, prev.removed) : null}
-          hint={prev ? `попередній період: ${prev.removed}` : undefined}
-        />
-        <StatCard
-          label="Заявок"
-          value={report?.applications ?? '—'}
-          delta={report && prev ? delta(report.applications, prev.applications) : null}
-          hint={prev ? `попередній період: ${prev.applications}` : undefined}
-        />
-        <StatCard
-          label="Сер. чек"
-          value={report ? money(report.avg_budget_cents) : '—'}
-          delta={
-            report && prev && report.avg_budget_cents && prev.avg_budget_cents
-              ? delta(report.avg_budget_cents, prev.avg_budget_cents)
-              : null
-          }
-          hint={prev?.avg_budget_cents ? `попередній: ${money(prev.avg_budget_cents)}` : undefined}
-        />
-      </div>
-
-      <div className="card">
-        <h2 className="feed__title">Статуси за період</h2>
-        <Donut parts={donutParts} />
-      </div>
-
-      <BarChart title="По вітках" rows={report?.by_branch || []} />
-      <BarChart title="По джерелах" rows={report?.by_source || []} />
-      <BarChart title="По днях" rows={report?.daily || []} />
-
-      <div className="card">
-        <h2 className="feed__title">Заявки та результати</h2>
-        <table className="table">
+      <h2 style={{ fontSize: 16, margin: '0 0 10px' }}>Прогони пошуку</h2>
+      {loading ? (
+        <p style={{ color: '#8b95a8' }}>Завантаження…</p>
+      ) : (
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
-              <th>Дата</th>
-              <th>Замовлення</th>
-              <th>Нотатка</th>
-              <th>Результат</th>
+              <th style={th}>ID</th>
+              <th style={th}>Статус</th>
+              <th style={th}>Почато</th>
+              <th style={th}>Завершено</th>
+              <th style={th}>Знайдено</th>
+              <th style={th}>PDF</th>
             </tr>
           </thead>
           <tbody>
-            {apps.length === 0 && (
-              <tr>
-                <td colSpan={4} className="page__hint">Заявок поки не було.</td>
-              </tr>
-            )}
-            {apps.map((a) => (
-              <tr key={a.id}>
-                <td>{new Date(a.applied_at).toLocaleString('uk-UA')}</td>
-                <td>{a.order_title}</td>
-                <td>{a.note || '—'}</td>
-                <td>
-                  <select
-                    className="select"
-                    value={a.result}
-                    onChange={(e) => setAppResult(a.id, e.target.value)}
-                  >
-                    {Object.entries(APP_RESULT_LABELS).map(([value, label]) => (
-                      <option key={value} value={value}>{label}</option>
-                    ))}
-                  </select>
+            {runs.map((run) => (
+              <tr key={run.id}>
+                <td style={td}>#{run.id}</td>
+                <td style={td}>{RUN_STATUS_LABELS[run.status] || run.status || '—'}</td>
+                <td style={td}>{formatDate(run.started_at)}</td>
+                <td style={td}>{formatDate(run.finished_at)}</td>
+                <td style={td}>{run.orders_found ?? '—'}</td>
+                <td style={td}>
+                  <button className='button' type='button' disabled={busyRun === run.id} onClick={() => generatePDF(run)}>
+                    {busyRun === run.id ? 'Генерується…' : 'Згенерувати PDF'}
+                  </button>
                 </td>
               </tr>
             ))}
+            {runs.length === 0 && (
+              <tr>
+                <td style={td} colSpan={6}>Прогонів пошуку ще немає.</td>
+              </tr>
+            )}
           </tbody>
         </table>
-      </div>
-    </section>
+      )}
+
+      <h2 style={{ fontSize: 16, margin: '24px 0 10px' }}>Готові PDF-звіти</h2>
+      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <thead>
+          <tr>
+            <th style={th}>ID</th>
+            <th style={th}>Файл</th>
+            <th style={th}>Замовлень</th>
+            <th style={th}>Створено</th>
+            <th style={th} />
+          </tr>
+        </thead>
+        <tbody>
+          {reports.map((report) => (
+            <tr key={report.id}>
+              <td style={td}>#{report.id}</td>
+              <td style={td}>{report.file_name}</td>
+              <td style={td}>{report.orders_total ?? '—'}</td>
+              <td style={td}>{formatDate(report.created_at)}</td>
+              <td style={td}>
+                <a className='button' style={{ textDecoration: 'none' }} href={`/api/reports/${report.id}/download`}>Завантажити</a>
+              </td>
+            </tr>
+          ))}
+          {reports.length === 0 && (
+            <tr>
+              <td style={td} colSpan={5}>Ще не згенеровано жодного PDF.</td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
   );
 }

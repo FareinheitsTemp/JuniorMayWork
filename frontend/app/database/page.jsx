@@ -1,268 +1,263 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { api } from '@/lib/api';
 import DataTable from '@/components/DataTable';
-import { statusLabel, EVENT_LABELS, APP_RESULT_LABELS } from '@/lib/status';
 
-const TABS = [
-  { key: 'orders', label: 'Замовлення' },
-  { key: 'events', label: 'Події' },
-  { key: 'applications', label: 'Заявки' },
-  { key: 'branches', label: 'Вітки' },
-];
+const TABLE_LABELS = {
+  sources: 'Джерела',
+  source_channels: 'Канали джерел',
+  source_runs: 'Прогони джерел',
+  branches: 'Вітки',
+  orders: 'Замовлення',
+  applications: 'Заявки',
+  events: 'Події',
+  search_profiles: 'Профілі пошуку',
+  search_runs: 'Прогони пошуку',
+  reports: 'Звіти',
+};
 
-const STATUSES = ['new', 'seen', 'applied', 'won', 'lost', 'archived'];
+const PAGE_SIZE = 100;
 
-function money(cents) {
-  if (cents == null) return '—';
-  return `$${(cents / 100).toLocaleString('en-US')}`;
+async function gridRequest(path, options = {}) {
+  const res = await fetch(`/api/grid${path}`, {
+    headers: { 'Content-Type': 'application/json' },
+    ...options,
+  });
+  if (!res.ok) {
+    let message = `HTTP ${res.status}`;
+    try {
+      const body = await res.json();
+      if (body && body.error) message = body.error;
+    } catch {}
+    throw new Error(message);
+  }
+  return res.json();
 }
 
-// «База даних»: прямий доступ до всіх таблиць у стилі Supabase.
-export default function DatabasePage() {
-  const [tab, setTab] = useState('orders');
-  const [orders, setOrders] = useState([]);
-  const [events, setEvents] = useState([]);
-  const [apps, setApps] = useState([]);
-  const [branches, setBranches] = useState([]);
-  const [flash, setFlash] = useState('');
+function inputType(column) {
+  if (column.type === 'boolean') return 'checkbox';
+  if (column.type.includes('int') || column.type.includes('numeric') || column.type.includes('float')) return 'number';
+  if (column.type.includes('json')) return 'textarea';
+  return 'text';
+}
 
-  const load = useCallback(async () => {
+function formatCell(value) {
+  if (value === null || value === undefined) return '—';
+  if (typeof value === 'boolean') return value ? 'так' : 'ні';
+  if (typeof value === 'object') return JSON.stringify(value);
+  return String(value);
+}
+
+export default function DatabasePage() {
+  const [tables, setTables] = useState([]);
+  const [table, setTable] = useState('orders');
+  const [rows, setRows] = useState([]);
+  const [columns, setColumns] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [editing, setEditing] = useState(null);
+  const [creating, setCreating] = useState(false);
+  const [draft, setDraft] = useState({});
+  const [busy, setBusy] = useState(false);
+
+  const loadTables = useCallback(async () => {
     try {
-      const [o, e, a, b] = await Promise.all([
-        api.orders({ limit: 500 }),
-        api.events(500),
-        api.applications(500),
-        api.branches(),
-      ]);
-      setOrders(o || []);
-      setEvents(e || []);
-      setApps(a || []);
-      setBranches(b || []);
+      const data = await gridRequest('');
+      setTables(data.tables || []);
     } catch (err) {
-      setFlash(`Помилка: ${err.message}`);
+      setError(`Таблиці недоступні: ${err.message}`);
     }
   }, []);
 
+  const loadRows = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await gridRequest(`/${table}?limit=${PAGE_SIZE}`);
+      setRows(data.rows || []);
+      setColumns(data.columns || []);
+      setError('');
+    } catch (err) {
+      setError(`Дані недоступні: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  }, [table]);
+
   useEffect(() => {
-    load();
-  }, [load]);
+    loadTables();
+  }, [loadTables]);
 
-  async function patchOrder(order, patch) {
+  useEffect(() => {
+    loadRows();
+  }, [loadRows]);
+
+  function startEdit(row) {
+    setCreating(false);
+    setEditing({ id: row.id });
+    const values = {};
+    for (const column of columns) {
+      if (column.name === 'id') continue;
+      values[column.name] = row[column.name] ?? (column.type === 'boolean' ? false : '');
+    }
+    setDraft(values);
+  }
+
+  function startCreate() {
+    setEditing(null);
+    setCreating(true);
+    const values = {};
+    for (const column of columns) {
+      if (column.name === 'id') continue;
+      values[column.name] = column.type === 'boolean' ? false : '';
+    }
+    setDraft(values);
+  }
+
+  function closeForm() {
+    setEditing(null);
+    setCreating(false);
+    setDraft({});
+  }
+
+  async function saveForm() {
+    const body = {};
+    for (const [key, value] of Object.entries(draft)) {
+      if (value === '') continue;
+      body[key] = value;
+    }
+    if (editing && !creating && Object.keys(body).length === 0) {
+      closeForm();
+      return;
+    }
+    setBusy(true);
     try {
-      await api.updateOrder(order.id, patch);
-      await load();
+      if (creating) {
+        await gridRequest(`/${table}`, { method: 'POST', body: JSON.stringify(body) });
+      } else if (editing) {
+        await gridRequest(`/${table}/${editing.id}`, { method: 'PATCH', body: JSON.stringify(body) });
+      }
+      closeForm();
+      await loadRows();
     } catch (err) {
-      setFlash(`Помилка: ${err.message}`);
+      setError(`Не вдалося зберегти: ${err.message}`);
+    } finally {
+      setBusy(false);
     }
   }
 
-  async function removeOrder(order) {
-    if (!window.confirm(`Видалити #${order.id} «${order.title}»?`)) return;
+  async function removeRow(row) {
+    if (!window.confirm(`Видалити рядок #${row.id} з таблиці ${table}?`)) return;
+    setBusy(true);
     try {
-      await api.deleteOrder(order.id);
-      await load();
+      await gridRequest(`/${table}/${row.id}`, { method: 'DELETE' });
+      await loadRows();
     } catch (err) {
-      setFlash(`Помилка: ${err.message}`);
+      setError(`Не вдалося видалити: ${err.message}`);
+    } finally {
+      setBusy(false);
     }
   }
 
-  async function removeBranch(b) {
-    if (!window.confirm(`Видалити вітку «${b.name}»?`)) return;
-    try {
-      await api.deleteBranch(b.id);
-      await load();
-    } catch (err) {
-      setFlash(`Помилка: ${err.message}`);
-    }
-  }
+  const formColumns = columns.filter((column) => column.name !== 'id');
+  const showForm = creating || editing !== null;
 
-  const orderColumns = [
-    { key: 'id', label: 'id' },
-    { key: 'source', label: 'Джерело' },
+  const tableColumns = [
+    ...columns.map((column) => ({
+      key: column.name,
+      label: column.name,
+      render: (row) => formatCell(row[column.name]),
+    })),
     {
-      key: 'title',
-      label: 'Заголовок',
-      render: (o) => (
-        <a href={o.url} target="_blank" rel="noreferrer">{o.title}</a>
-      ),
-    },
-    {
-      key: 'budget',
-      label: 'Бюджет',
-      sortValue: (o) => o.budget_cents ?? -1,
-      render: (o) => money(o.budget_cents),
-    },
-    {
-      key: 'branch_id',
-      label: 'Вітка',
-      sortValue: (o) => o.branch_id ?? 0,
-      render: (o) => (
-        <select
-          className="select"
-          value={o.branch_id ?? ''}
-          onChange={(e) => e.target.value && patchOrder(o, { branch_id: Number(e.target.value) })}
-        >
-          <option value="">—</option>
-          {branches.map((b) => (
-            <option key={b.id} value={b.id}>{b.name}</option>
-          ))}
-        </select>
-      ),
-    },
-    {
-      key: 'status',
-      label: 'Статус',
-      render: (o) => (
-        <select
-          className="select"
-          value={o.status}
-          onChange={(e) => patchOrder(o, { status: e.target.value })}
-        >
-          {STATUSES.map((s) => (
-            <option key={s} value={s}>{statusLabel(s)}</option>
-          ))}
-        </select>
-      ),
-    },
-    {
-      key: 'first_seen_at',
-      label: 'Побачено',
-      sortValue: (o) => o.first_seen_at,
-      render: (o) => new Date(o.first_seen_at).toLocaleString('uk-UA'),
-    },
-    {
-      key: '_del',
+      key: '__actions',
       label: '',
       sortable: false,
-      render: (o) => (
-        <button type="button" className="button button--danger" onClick={() => removeOrder(o)}>
-          ×
-        </button>
-      ),
-    },
-  ];
-
-  const eventColumns = [
-    { key: 'id', label: 'id' },
-    {
-      key: 'type',
-      label: 'Тип',
-      render: (e) => (
-        <span className={`badge badge--${e.type === 'removed' ? 'removed' : e.payload?.status || 'new'}`}>
-          {EVENT_LABELS[e.type] || e.type}
+      render: (row) => (
+        <span style={{ display: 'flex', gap: 6 }}>
+          <button className='button' type='button' onClick={() => startEdit(row)}>✎</button>
+          <button className='button' type='button' onClick={() => removeRow(row)}>✕</button>
         </span>
-      ),
-    },
-    {
-      key: 'title',
-      label: 'Замовлення',
-      sortValue: (e) => e.payload?.title ?? '',
-      render: (e) =>
-        e.payload?.url ? (
-          <a href={e.payload.url} target="_blank" rel="noreferrer">
-            {e.payload.title || `#${e.payload.order_id}`}
-          </a>
-        ) : (
-          `#${e.order_id ?? '—'}`
-        ),
-    },
-    {
-      key: 'created_at',
-      label: 'Дата',
-      sortValue: (e) => e.created_at,
-      render: (e) => new Date(e.created_at).toLocaleString('uk-UA'),
-    },
-  ];
-
-  const appColumns = [
-    { key: 'id', label: 'id' },
-    {
-      key: 'applied_at',
-      label: 'Дата',
-      sortValue: (a) => a.applied_at,
-      render: (a) => new Date(a.applied_at).toLocaleString('uk-UA'),
-    },
-    { key: 'order_title', label: 'Замовлення' },
-    { key: 'note', label: 'Нотатка', render: (a) => a.note || '—' },
-    {
-      key: 'result',
-      label: 'Результат',
-      render: (a) => (
-        <span className="badge badge--applied">{APP_RESULT_LABELS[a.result] || a.result}</span>
-      ),
-    },
-  ];
-
-  const branchColumns = [
-    { key: 'id', label: 'id' },
-    { key: 'name', label: 'Назва' },
-    {
-      key: 'keywords',
-      label: 'Ключові слова',
-      sortValue: (b) => (b.keywords || []).join(' '),
-      render: (b) => (b.keywords || []).join(', '),
-    },
-    {
-      key: 'max_budget_cents',
-      label: 'Ліміт',
-      render: (b) => `$${(b.max_budget_cents / 100).toFixed(0)}`,
-    },
-    { key: 'is_active', label: 'Активна', render: (b) => (b.is_active ? 'так' : 'ні') },
-    {
-      key: '_del',
-      label: '',
-      sortable: false,
-      render: (b) => (
-        <button type="button" className="button button--danger" onClick={() => removeBranch(b)}>
-          ×
-        </button>
       ),
     },
   ];
 
   return (
-    <section className="page">
-      <h1 className="page__title">База даних</h1>
-      <p className="page__subtitle">
-        Замовлення: {orders.length} · Події: {events.length} · Заявки: {apps.length} · Вітки: {branches.length}
-      </p>
-      {flash && <div className="page__hint">{flash}</div>}
+    <div className='db'>
+      <div className='db__head'>
+        <h2 className='page__title'>Керування базою даних</h2>
+        <p className='page__subtitle'>Перегляд і редагування таблиць — виберіть таблицю нижче.</p>
+      </div>
 
-      <div className="tabs">
-        {TABS.map((t) => (
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
+        {tables.map((name) => (
           <button
-            key={t.key}
-            type="button"
-            className={`tab ${tab === t.key ? 'tab--active' : ''}`}
-            onClick={() => setTab(t.key)}
+            key={name}
+            type='button'
+            className='button'
+            style={name === table ? { borderColor: '#2f6fed', fontWeight: 600 } : undefined}
+            onClick={() => setTable(name)}
           >
-            {t.label}
+            {TABLE_LABELS[name] || name}
           </button>
         ))}
       </div>
 
-      {tab === 'orders' && (
-        <div className="card">
-          <DataTable columns={orderColumns} rows={orders} empty="Таблиця порожня." />
+      {error && <p style={{ color: '#f85149' }}>{error}</p>}
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+        <button className='button' type='button' disabled={busy || !columns.length} onClick={startCreate}>Додати рядок</button>
+        <span style={{ color: '#8b95a8', fontSize: 13 }}>
+          {loading ? 'Завантаження…' : `${rows.length} рядків (максимум ${PAGE_SIZE}) у ${TABLE_LABELS[table] || table}`}
+        </span>
+      </div>
+
+      {loading ? (
+        <p style={{ color: '#8b95a8' }}>Завантаження даних…</p>
+      ) : (
+        <DataTable columns={tableColumns} rows={rows} />
+      )}
+
+      {showForm && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(15,19,29,0.6)', display: 'grid', placeItems: 'center', zIndex: 50 }}
+          onClick={closeForm}
+        >
+          <div
+            style={{ background: '#fff', borderRadius: 10, padding: 20, width: 480, maxHeight: '80vh', overflow: 'auto' }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 style={{ marginTop: 0, fontSize: 18 }}>{creating ? `Новий рядок — ${TABLE_LABELS[table] || table}` : `Рядок #${editing.id}`}</h2>
+            {formColumns.map((column) => (
+              <label key={column.name} style={{ display: 'block', marginBottom: 10, fontSize: 13 }}>
+                {column.name} <span style={{ color: '#8b95a8' }}>({column.type})</span>
+                {inputType(column) === 'checkbox' ? (
+                  <input
+                    type='checkbox'
+                    checked={!!draft[column.name]}
+                    onChange={(event) => setDraft({ ...draft, [column.name]: event.target.checked })}
+                  />
+                ) : inputType(column) === 'textarea' ? (
+                  <textarea
+                    style={{ width: '100%', minHeight: 60, boxSizing: 'border-box' }}
+                    value={String(draft[column.name] ?? '')}
+                    onChange={(event) => setDraft({ ...draft, [column.name]: event.target.value })}
+                  />
+                ) : (
+                  <input
+                    type={inputType(column)}
+                    style={{ width: '100%', boxSizing: 'border-box' }}
+                    value={String(draft[column.name] ?? '')}
+                    onChange={(event) => setDraft({ ...draft, [column.name]: inputType(column) === 'number' ? (event.target.value === '' ? '' : Number(event.target.value)) : event.target.value })}
+                  />
+                )}
+              </label>
+            ))}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className='button' type='button' disabled={busy} onClick={saveForm}>Зберегти</button>
+              <button className='button' type='button' onClick={closeForm}>Скасувати</button>
+            </div>
+          </div>
         </div>
       )}
-      {tab === 'events' && (
-        <div className="card">
-          <DataTable columns={eventColumns} rows={events} empty="Таблиця порожня." />
-        </div>
-      )}
-      {tab === 'applications' && (
-        <div className="card">
-          <DataTable columns={appColumns} rows={apps} empty="Таблиця порожня." />
-        </div>
-      )}
-      {tab === 'branches' && (
-        <div className="card">
-          <DataTable columns={branchColumns} rows={branches} empty="Таблиця порожня." />
-        </div>
-      )}
-    </section>
+    </div>
   );
 }
