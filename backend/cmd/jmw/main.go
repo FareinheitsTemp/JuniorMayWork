@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -61,6 +62,7 @@ func main() {
 	ar := archive.New(cfg.ArchiveDir)
 	manager := scraper.NewManager(st, ar, hub, cfg, log)
 	server := api.NewServer(st, manager, hub, log)
+	server.SetReportDir(filepath.Join(cfg.ArchiveDir, "reports"))
 
 	go manager.Run(ctx)
 
