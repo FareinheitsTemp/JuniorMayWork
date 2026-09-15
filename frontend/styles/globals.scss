@@ -135,7 +135,7 @@ a {
 }
 
 .page__subtitle {
-  margin: -14px 0 0;
+  margin: 4px 0 0;
   color: var(--text-dim);
   font-size: 14px;
 }
@@ -146,7 +146,7 @@ a {
 
 .page__row {
   display: flex;
-  gap: 16px;
+  gap: 15px;
   flex-wrap: wrap;
   align-items: flex-end;
 }
@@ -170,7 +170,7 @@ a {
 
 .card {
   background: var(--card);
-  border: 1px solid var(--line);
+  border: 2px solid var(--line);
   border-radius: var(--radius);
   padding: 16px;
   transition: border-color 0.2s;
@@ -184,9 +184,9 @@ a {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 7px 14px;
+  padding: 7px 10px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 10px;
   background: var(--bg-soft);
   color: var(--text);
   font-size: 14px;

@@ -1,15 +1,18 @@
 .tabs {
   display: flex;
-  gap: 4px;
+  gap: 20px;
   flex-wrap: wrap;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 2px solid var(--line);
+  border-radius: 10px;
+  
 }
 
 .tab {
-  padding: 8px 16px;
-  border: none;
+  padding: 10px 16px;
+  border: 20px;
+  border-radius: 10px;
   border-bottom: 2px solid transparent;
-  background: none;
+  background: transparent;
   color: var(--text-dim);
   font: inherit;
   font-size: 14px;
@@ -24,6 +27,7 @@
     color: var(--accent);
     border-bottom-color: var(--accent);
     font-weight: 600;
+    
   }
 }
 

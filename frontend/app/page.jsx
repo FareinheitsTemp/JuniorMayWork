@@ -135,8 +135,8 @@ export default function DashboardPage() {
       {flash && <div className="page__hint">{flash}</div>}
 
       <div className="page__row">
-        <StatCard label="Активні вітки" value={stats?.active_branches ?? '—'} />
-        <StatCard label="В роботі" value={stats?.orders_active ?? '—'} />
+        <StatCard label="Активні вітки" value={stats?.active_branches ?? '—'} hint={"на сьогодні:"} />
+        <StatCard label="В роботі" value={stats?.orders_active ?? '—'} hint={"Ваші робочі вітки"}/>
         <StatCard label="Нових сьогодні" value={stats?.orders_new_today ?? '—'} delta={stats ? delta(stats.orders_new_today, stats.orders_yesterday) : null} hint="проти вчора" />
         <StatCard label="За 7 днів" value={stats?.orders_last_7_days ?? '—'} delta={stats ? delta(stats.orders_last_7_days, stats.orders_prev_7_days) : null} hint="проти минулого тижня" />
         <StatCard label="Сер. чек" value={stats ? money(stats.avg_budget_cents) : '—'} hint={stats?.top_source ? `топ-джерело: ${stats.top_source}` : undefined} />

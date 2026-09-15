@@ -41,10 +41,10 @@ function statusColor(status) {
 
 function edgePath(from, to) {
   const x1 = Number(from.x) + Number(from.width);
-  const y1 = Number(from.y) + 44;
+  const y1 = Number(from.y) + 77;
   const x2 = Number(to.x);
   const y2 = Number(to.y) + 44;
-  const bend = Math.max(30, Math.min(90, Math.abs(y2 - y1) / 2 + 24));
+  const bend = Math.max(30, Math.min(90, Math.abs(y2 - y1) / 4 + 24));
   return `M ${x1} ${y1} C ${x1} ${y1 + bend}, ${x2} ${y2 - bend}, ${x2} ${y2}`;
 }
 

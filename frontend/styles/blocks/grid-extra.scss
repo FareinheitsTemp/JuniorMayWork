@@ -15,7 +15,7 @@
 
 .modal-card {
   background: var(--card);
-  border: 1px solid var(--line);
+  border: 2px solid var(--line);
   border-radius: var(--radius);
   padding: 22px;
   width: 100%;
@@ -94,12 +94,12 @@
   gap: 14px;
   flex-wrap: wrap;
   align-items: stretch;
-  margin-bottom: 20px;
+  margin-bottom: 70px;
 }
 
 .stat-row .card {
   background: var(--card);
-  border: 1px solid var(--line);
+  border: 0.3px solid var(--line);
   border-radius: var(--radius);
   padding: 14px 18px;
 }
