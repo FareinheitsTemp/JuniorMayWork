@@ -18,7 +18,7 @@ export default function Nav() {
     <header className="nav">
       <div className="nav__brand">
         Junior<span>May</span>Work
-        <span className="nav__live-dot" title="Сервер онлайн" />
+        <span className="nav__live-dot" suppressHydrationWarning />
       </div>
       <nav className="nav__links">
         {LINKS.map((l) => (
