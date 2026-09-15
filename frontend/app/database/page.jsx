@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import DataTable from '@/components/DataTable';
+import '@/styles/blocks/grid-extra.scss';
 
 const TABLE_LABELS = {
   sources: 'Джерела',
@@ -15,8 +16,6 @@ const TABLE_LABELS = {
   search_runs: 'Прогони пошуку',
   reports: 'Звіти',
 };
-
-const PAGE_SIZE = 100;
 
 async function gridRequest(path, options = {}) {
   const res = await fetch(`/api/grid${path}`, {
@@ -72,7 +71,7 @@ export default function DatabasePage() {
   const loadRows = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await gridRequest(`/${table}?limit=${PAGE_SIZE}`);
+      const data = await gridRequest(`/${table}?limit=200`);
       setRows(data.rows || []);
       setColumns(data.columns || []);
       setError('');
@@ -146,7 +145,7 @@ export default function DatabasePage() {
   }
 
   async function removeRow(row) {
-    if (!window.confirm(`Видалити рядок #${row.id} з таблиці ${table}?`)) return;
+    if (!window.confirm(`Видалити рядок #${row.id} з таблиці «${TABLE_LABELS[table] || table}»?`)) return;
     setBusy(true);
     try {
       await gridRequest(`/${table}/${row.id}`, { method: 'DELETE' });
@@ -165,6 +164,7 @@ export default function DatabasePage() {
     ...columns.map((column) => ({
       key: column.name,
       label: column.name,
+      sortValue: (row) => row[column.name],
       render: (row) => formatCell(row[column.name]),
     })),
     {
@@ -172,28 +172,27 @@ export default function DatabasePage() {
       label: '',
       sortable: false,
       render: (row) => (
-        <span style={{ display: 'flex', gap: 6 }}>
-          <button className='button' type='button' onClick={() => startEdit(row)}>✎</button>
-          <button className='button' type='button' onClick={() => removeRow(row)}>✕</button>
-        </span>
+        <div className="row-actions">
+          <button className="button" type="button" onClick={() => startEdit(row)}>Редагувати</button>
+          <button className="button button--danger" type="button" onClick={() => removeRow(row)}>Видалити</button>
+        </div>
       ),
     },
   ];
 
   return (
-    <div className='db'>
-      <div className='db__head'>
-        <h2 className='page__title'>Керування базою даних</h2>
-        <p className='page__subtitle'>Перегляд і редагування таблиць — виберіть таблицю нижче.</p>
+    <div>
+      <div className="page__head">
+        <h1 className="page__title">Керування базою даних</h1>
+        <p className="page__subtitle">Перегляд і редагування таблиць — виберіть таблицю нижче.</p>
       </div>
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
+      <div className="tabs" style={{ marginBottom: 18 }}>
         {tables.map((name) => (
           <button
             key={name}
-            type='button'
-            className='button'
-            style={name === table ? { borderColor: '#2f6fed', fontWeight: 600 } : undefined}
+            type="button"
+            className={`tab ${name === table ? 'tab--active' : ''}`}
             onClick={() => setTable(name)}
           >
             {TABLE_LABELS[name] || name}
@@ -201,59 +200,63 @@ export default function DatabasePage() {
         ))}
       </div>
 
-      {error && <p style={{ color: '#f85149' }}>{error}</p>}
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-        <button className='button' type='button' disabled={busy || !columns.length} onClick={startCreate}>Додати рядок</button>
-        <span style={{ color: '#8b95a8', fontSize: 13 }}>
-          {loading ? 'Завантаження…' : `${rows.length} рядків (максимум ${PAGE_SIZE}) у ${TABLE_LABELS[table] || table}`}
-        </span>
-      </div>
+      {error && <p style={{ color: 'var(--bad)' }}>{error}</p>}
 
       {loading ? (
-        <p style={{ color: '#8b95a8' }}>Завантаження даних…</p>
+        <p className="empty-hint">Завантаження даних…</p>
       ) : (
-        <DataTable columns={tableColumns} rows={rows} />
+        <DataTable
+          columns={tableColumns}
+          rows={rows}
+          pageSize={20}
+          empty="У цій таблиці ще немає рядків."
+          toolbar={
+            <button className="button" type="button" disabled={busy || !columns.length} onClick={startCreate}>
+              + Додати рядок
+            </button>
+          }
+        />
       )}
 
       {showForm && (
-        <div
-          style={{ position: 'fixed', inset: 0, background: 'rgba(15,19,29,0.6)', display: 'grid', placeItems: 'center', zIndex: 50 }}
-          onClick={closeForm}
-        >
-          <div
-            style={{ background: '#fff', borderRadius: 10, padding: 20, width: 480, maxHeight: '80vh', overflow: 'auto' }}
-            onClick={(event) => event.stopPropagation()}
-          >
-            <h2 style={{ marginTop: 0, fontSize: 18 }}>{creating ? `Новий рядок — ${TABLE_LABELS[table] || table}` : `Рядок #${editing.id}`}</h2>
+        <div className="modal-overlay" onClick={closeForm}>
+          <div className="modal-card" onClick={(event) => event.stopPropagation()}>
+            <h2>{creating ? `Новий рядок — ${TABLE_LABELS[table] || table}` : `Рядок #${editing.id}`}</h2>
             {formColumns.map((column) => (
-              <label key={column.name} style={{ display: 'block', marginBottom: 10, fontSize: 13 }}>
-                {column.name} <span style={{ color: '#8b95a8' }}>({column.type})</span>
+              <label key={column.name} className={`field ${inputType(column) === 'checkbox' ? 'field--checkbox' : ''}`}>
                 {inputType(column) === 'checkbox' ? (
-                  <input
-                    type='checkbox'
-                    checked={!!draft[column.name]}
-                    onChange={(event) => setDraft({ ...draft, [column.name]: event.target.checked })}
-                  />
-                ) : inputType(column) === 'textarea' ? (
-                  <textarea
-                    style={{ width: '100%', minHeight: 60, boxSizing: 'border-box' }}
-                    value={String(draft[column.name] ?? '')}
-                    onChange={(event) => setDraft({ ...draft, [column.name]: event.target.value })}
-                  />
+                  <>
+                    <input
+                      type="checkbox"
+                      checked={!!draft[column.name]}
+                      onChange={(event) => setDraft({ ...draft, [column.name]: event.target.checked })}
+                    />
+                    {column.name} <span className="field__hint">({column.type})</span>
+                  </>
                 ) : (
-                  <input
-                    type={inputType(column)}
-                    style={{ width: '100%', boxSizing: 'border-box' }}
-                    value={String(draft[column.name] ?? '')}
-                    onChange={(event) => setDraft({ ...draft, [column.name]: inputType(column) === 'number' ? (event.target.value === '' ? '' : Number(event.target.value)) : event.target.value })}
-                  />
+                  <>
+                    {column.name} <span className="field__hint">({column.type})</span>
+                    {inputType(column) === 'textarea' ? (
+                      <textarea
+                        className="textarea"
+                        value={String(draft[column.name] ?? '')}
+                        onChange={(event) => setDraft({ ...draft, [column.name]: event.target.value })}
+                      />
+                    ) : (
+                      <input
+                        className="input"
+                        type={inputType(column)}
+                        value={String(draft[column.name] ?? '')}
+                        onChange={(event) => setDraft({ ...draft, [column.name]: inputType(column) === 'number' ? (event.target.value === '' ? '' : Number(event.target.value)) : event.target.value })}
+                      />
+                    )}
+                  </>
                 )}
               </label>
             ))}
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button className='button' type='button' disabled={busy} onClick={saveForm}>Зберегти</button>
-              <button className='button' type='button' onClick={closeForm}>Скасувати</button>
+            <div className="modal-card__actions">
+              <button className="button" type="button" disabled={busy} onClick={saveForm}>Зберегти</button>
+              <button className="button" type="button" onClick={closeForm}>Скасувати</button>
             </div>
           </div>
         </div>

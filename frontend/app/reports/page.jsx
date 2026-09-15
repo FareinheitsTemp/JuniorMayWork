@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import StatCard from '@/components/StatCard';
 import Donut from '@/components/Donut';
+import '@/styles/blocks/grid-extra.scss';
 
 const RUN_STATUS_LABELS = {
   queued: 'у черзі',
@@ -12,12 +13,20 @@ const RUN_STATUS_LABELS = {
   failed: 'помилка',
 };
 
+const RUN_STATUS_DOT = {
+  queued: 'idle',
+  running: 'warn',
+  completed: 'ok',
+  partial: 'warn',
+  failed: 'bad',
+};
+
 const RUN_STATUS_COLORS = {
-  queued: '#8b95a8',
-  running: '#d29922',
-  completed: '#3fb950',
-  partial: '#a371f7',
-  failed: '#f85149',
+  queued: 'var(--text-dim)',
+  running: 'var(--warn)',
+  completed: 'var(--good)',
+  partial: 'var(--warn)',
+  failed: 'var(--bad)',
 };
 
 async function request(path, options = {}) {
@@ -95,29 +104,26 @@ export default function ReportsPage() {
     }))
     .filter((part) => part.value > 0);
 
-  const th = { textAlign: 'left', padding: '8px 10px', borderBottom: '1px solid #e3e7ee', fontSize: 13, color: '#5a6474' };
-  const td = { padding: '8px 10px', borderBottom: '1px solid #eef1f5', fontSize: 13 };
-
   return (
-    <div className='reports'>
-      <div className='db__head'>
-        <h1 className='page__title'>Звіти</h1>
-        <p className='page__subtitle'>Зведення по замовленнях та PDF-звіти прогонів пошуку.</p>
+    <div>
+      <div className="page__head">
+        <h1 className="page__title">Звіти</h1>
+        <p className="page__subtitle">Зведення по замовленнях та PDF-звіти прогонів пошуку.</p>
       </div>
 
-      {error && <p style={{ color: '#f85149' }}>{error}</p>}
+      {error && <p style={{ color: 'var(--bad)' }}>{error}</p>}
 
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center', marginBottom: 20 }}>
-        <StatCard label='Замовлень усього' value={summary ? (summary.total_orders ?? '—') : '…'} />
-        <StatCard label='Прогонів пошуку' value={runs.length} />
-        <StatCard label='PDF-звітів' value={reports.length} />
+      <div className="stat-row">
+        <div className="card"><StatCard label="Замовлень усього" value={summary ? (summary.total_orders ?? '—') : '…'} /></div>
+        <div className="card"><StatCard label="Прогонів пошуку" value={runs.length} /></div>
+        <div className="card"><StatCard label="PDF-звітів" value={reports.length} /></div>
         {statusParts.length > 0 && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <Donut parts={statusParts} size={120} />
-            <div style={{ fontSize: 12, color: '#5a6474' }}>
+          <div className="donut-card">
+            <Donut parts={statusParts} size={110} />
+            <div className="donut-card__legend">
               {statusParts.map((part) => (
-                <div key={part.label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ width: 8, height: 8, borderRadius: 4, background: part.color, display: 'inline-block' }} />
+                <div key={part.label} className="donut-card__legend-item">
+                  <span className="status-dot" style={{ background: part.color }} />
                   {part.label}: {part.value}
                 </div>
               ))}
@@ -127,81 +133,88 @@ export default function ReportsPage() {
       </div>
 
       {lastReport && (
-        <div style={{ background: '#eaf6ec', border: '1px solid #bfe3c6', borderRadius: 8, padding: '10px 14px', marginBottom: 18, display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div className="report-banner">
           <strong>PDF готовий:</strong> {lastReport.file_name}
-          <a className='button' style={{ textDecoration: 'none' }} href={lastReport.download}>Завантажити</a>
+          <a className="button" href={lastReport.download}>Завантажити</a>
         </div>
       )}
 
-      <h2 style={{ fontSize: 16, margin: '0 0 10px' }}>Прогони пошуку</h2>
+      <h2 className="section-title">Прогони пошуку</h2>
       {loading ? (
-        <p style={{ color: '#8b95a8' }}>Завантаження…</p>
+        <p className="empty-hint">Завантаження…</p>
       ) : (
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <div className="grid__scroll">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Статус</th>
+                <th>Почато</th>
+                <th>Завершено</th>
+                <th>Знайдено</th>
+                <th>PDF</th>
+              </tr>
+            </thead>
+            <tbody>
+              {runs.map((run) => (
+                <tr key={run.id}>
+                  <td>#{run.id}</td>
+                  <td>
+                    <span className={`status-dot status-dot--${RUN_STATUS_DOT[run.status] || 'idle'}`} />
+                    {RUN_STATUS_LABELS[run.status] || run.status || '—'}
+                  </td>
+                  <td>{formatDate(run.started_at)}</td>
+                  <td>{formatDate(run.finished_at)}</td>
+                  <td>{run.orders_found ?? '—'}</td>
+                  <td>
+                    <button className="button" type="button" disabled={busyRun === run.id} onClick={() => generatePDF(run)}>
+                      {busyRun === run.id ? 'Генерується…' : 'Згенерувати PDF'}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {runs.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="empty-hint">Прогонів пошуку ще немає.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <h2 className="section-title">Готові PDF-звіти</h2>
+      <div className="grid__scroll">
+        <table className="table">
           <thead>
             <tr>
-              <th style={th}>ID</th>
-              <th style={th}>Статус</th>
-              <th style={th}>Почато</th>
-              <th style={th}>Завершено</th>
-              <th style={th}>Знайдено</th>
-              <th style={th}>PDF</th>
+              <th>ID</th>
+              <th>Файл</th>
+              <th>Замовлень</th>
+              <th>Створено</th>
+              <th />
             </tr>
           </thead>
           <tbody>
-            {runs.map((run) => (
-              <tr key={run.id}>
-                <td style={td}>#{run.id}</td>
-                <td style={td}>{RUN_STATUS_LABELS[run.status] || run.status || '—'}</td>
-                <td style={td}>{formatDate(run.started_at)}</td>
-                <td style={td}>{formatDate(run.finished_at)}</td>
-                <td style={td}>{run.orders_found ?? '—'}</td>
-                <td style={td}>
-                  <button className='button' type='button' disabled={busyRun === run.id} onClick={() => generatePDF(run)}>
-                    {busyRun === run.id ? 'Генерується…' : 'Згенерувати PDF'}
-                  </button>
+            {reports.map((report) => (
+              <tr key={report.id}>
+                <td>#{report.id}</td>
+                <td>{report.file_name}</td>
+                <td>{report.orders_total ?? '—'}</td>
+                <td>{formatDate(report.created_at)}</td>
+                <td>
+                  <a className="button" href={`/api/reports/${report.id}/download`}>Завантажити</a>
                 </td>
               </tr>
             ))}
-            {runs.length === 0 && (
+            {reports.length === 0 && (
               <tr>
-                <td style={td} colSpan={6}>Прогонів пошуку ще немає.</td>
+                <td colSpan={5} className="empty-hint">Ще не згенеровано жодного PDF.</td>
               </tr>
             )}
           </tbody>
         </table>
-      )}
-
-      <h2 style={{ fontSize: 16, margin: '24px 0 10px' }}>Готові PDF-звіти</h2>
-      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-        <thead>
-          <tr>
-            <th style={th}>ID</th>
-            <th style={th}>Файл</th>
-            <th style={th}>Замовлень</th>
-            <th style={th}>Створено</th>
-            <th style={th} />
-          </tr>
-        </thead>
-        <tbody>
-          {reports.map((report) => (
-            <tr key={report.id}>
-              <td style={td}>#{report.id}</td>
-              <td style={td}>{report.file_name}</td>
-              <td style={td}>{report.orders_total ?? '—'}</td>
-              <td style={td}>{formatDate(report.created_at)}</td>
-              <td style={td}>
-                <a className='button' style={{ textDecoration: 'none' }} href={`/api/reports/${report.id}/download`}>Завантажити</a>
-              </td>
-            </tr>
-          ))}
-          {reports.length === 0 && (
-            <tr>
-              <td style={td} colSpan={5}>Ще не згенеровано жодного PDF.</td>
-            </tr>
-          )}
-        </tbody>
-      </table>
+      </div>
     </div>
   );
 }
