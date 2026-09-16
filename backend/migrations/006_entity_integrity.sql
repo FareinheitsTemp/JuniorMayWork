@@ -1,8 +1,33 @@
 -- 006_entity_integrity.sql — Фаза A рендизайну БД v2 (адитивна, без ламання коду).
 -- Джерело дизайну: затверджений користувачем DB_DESIGN_V2.
 -- Типи FK-колонок підігнані під існуючі типи v1 (orders.id INTEGER,
--- reports.id BIGINT, sources.id INTEGER); нові таблиці — BIGINT GENERATED
--- ALWAYS AS IDENTITY за дизайном. Ідемпотентно: IF NOT EXISTS / ON CONFLICT.
+-- sources.id INTEGER); нові таблиці — BIGINT GENERATED ALWAYS AS IDENTITY.
+-- Ідемпотентно: IF NOT EXISTS / ON CONFLICT.
+
+-- ---------- БАЗОВА ТАБЛИЦЯ REPOРТІВ (якщо не існує) ----------
+-- У 003 таблиця називалася report_exports; для звітів v2 канонічне ім'я
+-- reports (зв'язане з reports_pdf.go, report_downloads, 007, 009).
+CREATE TABLE IF NOT EXISTS reports (
+  id            BIGSERIAL PRIMARY KEY,
+  search_run_id BIGINT NOT NULL REFERENCES search_runs(id) ON DELETE CASCADE,
+  file_name     TEXT NOT NULL,
+  storage_key   TEXT NOT NULL,
+  mime_type     TEXT NOT NULL DEFAULT 'application/pdf',
+  orders_total  INTEGER NOT NULL DEFAULT 0 CHECK (orders_total >= 0),
+  summary_json  JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Якщо існувала стара report_exports — підтягуємо з неї записи.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'report_exports') THEN
+    INSERT INTO reports (id, search_run_id, file_name, storage_key, mime_type, orders_total, summary_json, created_at)
+    SELECT id, search_run_id, file_name, storage_key, mime_type, orders_total, summary_json, created_at
+    FROM report_exports
+    ON CONFLICT (id) DO NOTHING;
+  END IF;
+END $$;
 
 -- ---------- ДОВІДНИКИ ----------
 
@@ -64,7 +89,7 @@ WHERE  o.status_id IS NULL
 
 CREATE TABLE IF NOT EXISTS order_status_history (
   id             BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  order_id       Integer NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  order_id       INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
   from_status_id SMALLINT REFERENCES order_statuses(id) ON DELETE SET NULL,
   to_status_id   SMALLINT NOT NULL REFERENCES order_statuses(id) ON DELETE RESTRICT,
   actor          TEXT,
