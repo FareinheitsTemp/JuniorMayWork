@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import StatCard from '@/components/StatCard';
 import Donut from '@/components/Donut';
+import { TerminalIcon, RefreshIcon } from '@/components/Icons';
 import '@/styles/blocks/grid-extra.scss';
 
 async function request(path, options = {}) {
@@ -41,7 +42,6 @@ const OUTCOME_DOT = {
   running: 'warn',
 };
 
-// Claude Code Dark Terminal Dashboard
 export default function DashboardPage() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -77,13 +77,14 @@ export default function DashboardPage() {
       <div className="page__row" style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent)', fontSize: 13, fontWeight: 600 }}>›_</span>
+            <TerminalIcon size={18} style={{ color: 'var(--accent)' }} />
             <h1 className="page__title">Дашборд системи</h1>
           </div>
           <p className="page__subtitle">Телеметрія збору замовлень, аналітика джерел і динаміка за 30 днів.</p>
         </div>
         <button className="button" type="button" onClick={load}>
-          <span>↻</span> Оновити
+          <RefreshIcon size={14} />
+          <span>Оновити</span>
         </button>
       </div>
       {error && <div className="toast" onClick={() => setError('')}>{error}</div>}

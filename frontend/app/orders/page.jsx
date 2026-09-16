@@ -1,6 +1,13 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import {
+  TerminalIcon,
+  SearchIcon,
+  ExternalLinkIcon,
+  CloseIcon,
+  PlusIcon,
+} from '@/components/Icons';
 import '@/styles/blocks/grid-extra.scss';
 
 const PAGE_SIZE = 100;
@@ -141,7 +148,7 @@ export default function OrdersPage() {
   return (
     <section className="page">
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent)', fontSize: 13, fontWeight: 600 }}>›_</span>
+        <TerminalIcon size={18} style={{ color: 'var(--accent)' }} />
         <h1 className="page__title">Каталог замовлень</h1>
       </div>
       <p className="page__subtitle">Пріоритетний список вакансій: інспектор деталей, Git-style історія статусів, нотатки.</p>
@@ -161,8 +168,15 @@ export default function OrdersPage() {
         })}
       </div>
 
-      <div className="field" style={{ marginBottom: 14 }}>
-        <input className="input" placeholder="Пошук за назвою або джерелом (фільтр на льоту)…" value={search} onChange={(e) => setSearch(e.target.value)} />
+      <div style={{ position: 'relative', marginBottom: 14 }}>
+        <SearchIcon size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+        <input
+          className="input"
+          style={{ paddingLeft: 34, width: '100%' }}
+          placeholder="Пошук за назвою або джерелом (фільтр на льоту)…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
       </div>
 
       <div className="grid__scroll">
@@ -230,7 +244,9 @@ export default function OrdersPage() {
               <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--accent)' }}>
                 ORDER_INSPECTOR #{selected.id}
               </span>
-              <button className="button button--sm" type="button" onClick={closeOrder}>✕</button>
+              <button className="button button--sm" type="button" onClick={closeOrder}>
+                <CloseIcon size={12} />
+              </button>
             </div>
 
             <h2 style={{ fontSize: 16, lineHeight: 1.4 }}>{selected.title || `Замовлення #${selected.id}`}</h2>
@@ -244,7 +260,8 @@ export default function OrdersPage() {
             {selected.url && (
               <div style={{ marginBottom: 16 }}>
                 <a className="button button--sm" href={selected.url} target="_blank" rel="noreferrer">
-                  Відкрити на сайті джерела ↗
+                  <span>Відкрити на сайті джерела</span>
+                  <ExternalLinkIcon size={12} />
                 </a>
               </div>
             )}
@@ -263,7 +280,8 @@ export default function OrdersPage() {
               <textarea className="textarea" placeholder="Додати робочу нотатку до замовлення…" value={noteText} onChange={(e) => setNoteText(e.target.value)} />
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 6 }}>
                 <button className="button button--primary" type="button" disabled={busy || !noteText.trim()} onClick={() => addNote(selected)}>
-                  + Додати нотатку
+                  <PlusIcon size={13} />
+                  <span>Додати нотатку</span>
                 </button>
               </div>
             </div>
