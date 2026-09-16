@@ -16,6 +16,9 @@ var gridTables = map[string]struct{}{
 	"sources": {}, "source_channels": {}, "source_runs": {},
 	"branches": {}, "orders": {}, "applications": {}, "events": {},
 	"search_profiles": {}, "search_runs": {}, "reports": {},
+	"order_statuses": {}, "application_results": {}, "skills": {}, "tags": {},
+	"order_notes": {}, "order_status_history": {}, "audit_log": {},
+	"report_downloads": {}, "search_run_daily_stats": {},
 }
 
 func GridTableAllowed(table string) bool {
