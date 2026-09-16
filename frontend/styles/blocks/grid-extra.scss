@@ -1,13 +1,10 @@
-// Додаткові стилі для сторінок /database, /reports, /orders та дашборда:
-// модалка редагування, кольорові маркери статусу, банер готового звіту,
-// стовпчикова динаміка і скелетони. Доповнює db.scss — нічого не
-// перевизначає, лише додає нові класи.
+// Додаткові стилі в естетиці Claude Code (Anthropic Dark Terminal)
 
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(6, 8, 13, 0.6);
-  backdrop-filter: blur(2px);
+  background: rgba(10, 10, 9, 0.75);
+  backdrop-filter: blur(4px);
   display: grid;
   place-items: center;
   z-index: 100;
@@ -16,53 +13,72 @@
 
 .modal-card {
   background: var(--card);
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-light);
   border-radius: var(--radius);
   padding: 22px;
   width: 100%;
-  max-width: 480px;
-  max-height: 82vh;
-  overflow: auto;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
-}
+  max-width: 520px;
+  max-height: 84vh;
+  overflow-y: auto;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
 
-.modal-card h2 {
-  margin: 0 0 16px;
-  font-size: 17px;
-  color: var(--text);
+  h2 {
+    margin: 0 0 12px;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text);
+    letter-spacing: -0.01em;
+  }
+
+  h3 {
+    margin: 16px 0 8px;
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-dim);
+  }
+
+  &__actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 18px;
+    justify-content: flex-end;
+  }
 }
 
 .field {
   display: block;
-  margin-bottom: 14px;
-  font-size: 13px;
+  margin-bottom: 12px;
+  font-size: 12.5px;
   color: var(--text-dim);
-}
 
-.field__hint {
-  color: var(--text-dim);
-  font-weight: 400;
-}
+  &__label {
+    display: block;
+    font-weight: 500;
+    margin-bottom: 4px;
+    color: var(--text-dim);
+  }
 
-.field .input,
-.field .select,
-.field .textarea {
-  display: block;
-  width: 100%;
-  margin-top: 6px;
-  box-sizing: border-box;
-}
+  &__hint {
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    margin-left: 4px;
+  }
 
-.field--checkbox {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
+  .input, .select, .textarea {
+    display: block;
+    width: 100%;
+    margin-top: 4px;
+  }
 
-.modal-card__actions {
-  display: flex;
-  gap: 10px;
-  margin-top: 18px;
+  &--checkbox {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+  }
 }
 
 .row-actions {
@@ -71,62 +87,60 @@
   justify-content: flex-end;
 }
 
-.row-actions .button {
-  padding: 4px 10px;
-  font-size: 13px;
-}
+// ---------------- TERMINAL STATUS DOTS ----------------
 
 .status-dot {
   display: inline-block;
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   margin-right: 6px;
   vertical-align: middle;
+
+  &--ok { background: var(--good); }
+  &--warn { background: var(--warn); }
+  &--bad { background: var(--bad); }
+  &--idle { background: var(--text-muted); }
 }
 
-.status-dot--ok { background: var(--good); }
-.status-dot--warn { background: var(--warn); }
-.status-dot--bad { background: var(--bad); }
-.status-dot--idle { background: var(--text-dim); }
+// ---------------- STAT ROW & CARDS ----------------
 
 .stat-row {
-  display: flex;
-  gap: 14px;
-  flex-wrap: wrap;
-  align-items: stretch;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
   margin-bottom: 20px;
-}
 
-.stat-row .card {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-  padding: 14px 18px;
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    padding: 14px 16px;
+  }
 }
 
 .donut-card {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 16px;
   background: var(--card);
   border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: 12px 18px;
-}
 
-.donut-card__legend {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--text-dim);
-}
+  &__legend {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    font-size: 12px;
+    font-family: var(--font-mono);
+    color: var(--text-dim);
+  }
 
-.donut-card__legend-item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  &__legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
 }
 
 .report-banner {
@@ -136,61 +150,78 @@
   background: var(--accent-soft);
   border: 1px solid var(--accent);
   border-radius: var(--radius);
-  padding: 12px 16px;
+  padding: 10px 14px;
   margin-bottom: 18px;
-  color: var(--text);
-}
+  font-size: 13px;
 
-.report-banner strong {
-  color: var(--good);
+  strong {
+    color: var(--accent);
+    font-family: var(--font-mono);
+  }
 }
 
 .section-title {
-  font-size: 15px;
-  color: var(--text);
-  margin: 26px 0 10px;
+  font-size: 13px;
   font-weight: 600;
-}
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+  margin: 24px 0 10px;
 
-.section-title:first-of-type {
-  margin-top: 0;
+  &:first-of-type {
+    margin-top: 0;
+  }
 }
 
 .empty-hint {
-  color: var(--text-dim);
-  font-size: 13px;
-  padding: 14px 4px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  padding: 16px 0;
+  text-align: center;
 }
 
-// Дашборд: стовпчикова динаміка надходжень за 30 днів.
+// ---------------- CLAUDE CODE DASH-CHART (TERRACOTTA BARS) ----------------
+
 .dash-chart {
   display: flex;
   align-items: flex-end;
-  gap: 2px;
-  height: 110px;
+  gap: 3px;
+  height: 95px;
+  padding-top: 10px;
+
+  &__bar {
+    flex: 1;
+    min-height: 2px;
+    border-radius: 2px 2px 0 0;
+    background: var(--accent);
+    opacity: 0.85;
+    transition: opacity 0.12s, height 0.2s ease;
+
+    &:hover {
+      opacity: 1;
+      background: var(--accent-hover);
+    }
+  }
+
+  &__axis {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 8px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    border-top: 1px dashed var(--line);
+    padding-top: 6px;
+  }
 }
 
-.dash-chart__bar {
-  flex: 1;
-  min-height: 2px;
-  border-radius: 2px;
-  background: var(--accent);
-  transition: height 0.2s ease;
-}
+// ---------------- TERMINAL SHIMMER SKELETON ----------------
 
-.dash-chart__axis {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 6px;
-  font-size: 11px;
-  color: var(--text-dim);
-}
-
-// Скелетон завантаження.
 .skeleton {
   height: 14px;
-  border-radius: var(--radius);
-  background: linear-gradient(90deg, var(--card) 25%, var(--card-hover, #1c2330) 50%, var(--card) 75%);
+  border-radius: var(--radius-sm);
+  background: linear-gradient(90deg, var(--card) 25%, var(--card-hover) 50%, var(--card) 75%);
   background-size: 200% 100%;
   animation: skeleton-shimmer 1.4s ease infinite;
 }
@@ -203,20 +234,30 @@
 .skeleton-list {
   display: grid;
   gap: 8px;
+  padding: 12px 0;
 }
 
-// Тост помилок (клік — закрити).
+// ---------------- CLAUDE TOAST ----------------
+
 .toast {
   position: fixed;
-  right: 16px;
-  bottom: 16px;
+  right: 18px;
+  bottom: 18px;
   z-index: 200;
-  max-width: 380px;
+  max-width: 420px;
   padding: 10px 14px;
   border-radius: var(--radius);
-  background: var(--bad);
-  color: #fff;
-  font-size: 13px;
+  background: #241414;
+  color: #ff9999;
+  border: 1px solid var(--bad);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
   cursor: pointer;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+}
+
+.grid__scroll {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
 }
