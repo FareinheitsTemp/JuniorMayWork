@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -56,7 +57,16 @@ func (s *Server) HandleRunReportCreate(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	reportID, err := s.store.InsertReport(r.Context(), runID, fileName, storageKey, len(report.Jobs), "{}")
+	summary, _ := json.Marshal(map[string]any{
+		"sources":      len(report.Sources),
+		"daily_points": len(report.Daily),
+		"applications": report.Applications,
+		"duplicates":   report.Duplicates,
+	})
+	if len(summary) == 0 {
+		summary = []byte("{}")
+	}
+	reportID, err := s.store.InsertReport(r.Context(), runID, "run", fileName, storageKey, len(report.Jobs), string(summary))
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, err.Error())
 		return
@@ -85,6 +95,8 @@ func (s *Server) HandleReportDownload(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusNotFound, "звіт не знайдено")
 		return
 	}
+	// Лог завантажень (report_downloads, міграція 006) — не критичний для віддачі файлу.
+	_ = s.store.LogReportDownload(r.Context(), id, r.UserAgent())
 	w.Header().Set("Content-Type", "application/pdf")
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", fileName))
 	http.ServeFile(w, r, storageKey)

@@ -29,6 +29,11 @@ const RUN_STATUS_COLORS = {
   failed: 'var(--bad)',
 };
 
+const TYPE_LABELS = {
+  run: 'Прогін',
+  summary: 'Зведення',
+};
+
 async function request(path, options = {}) {
   const res = await fetch(`/api${path}`, {
     headers: { 'Content-Type': 'application/json' },
@@ -51,6 +56,7 @@ function formatDate(value) {
   return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString('uk-UA');
 }
 
+// Звіти: зведення, прогони пошуку з генерацією PDF і керування готовими звітами.
 export default function ReportsPage() {
   const [summary, setSummary] = useState(null);
   const [runs, setRuns] = useState([]);
@@ -58,7 +64,9 @@ export default function ReportsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [busyRun, setBusyRun] = useState(null);
+  const [busyReport, setBusyReport] = useState(null);
   const [lastReport, setLastReport] = useState(null);
+  const [runFilter, setRunFilter] = useState('');
 
   const load = useCallback(async () => {
     try {
@@ -96,10 +104,25 @@ export default function ReportsPage() {
     }
   }
 
+  async function removeReport(report) {
+    if (!window.confirm(`Видалити звіт #${report.id} (${report.file_name})?`)) return;
+    setBusyReport(report.id);
+    try {
+      await request(`/grid/reports/${report.id}`, { method: 'DELETE' });
+      await load();
+    } catch (err) {
+      setError(`Не вдалося видалити звіт: ${err.message}`);
+    } finally {
+      setBusyReport(null);
+    }
+  }
+
+  const runsVisible = runFilter ? runs.filter((run) => run.status === runFilter) : runs;
+
   const statusParts = Object.entries(RUN_STATUS_LABELS)
     .map(([key, label]) => ({
       label,
-      value: runs.filter((run) => run.status === key).length,
+      value: runsVisible.filter((run) => run.status === key).length,
       color: RUN_STATUS_COLORS[key],
     }))
     .filter((part) => part.value > 0);
@@ -140,6 +163,15 @@ export default function ReportsPage() {
       )}
 
       <h2 className="section-title">Прогони пошуку</h2>
+      <div className="field" style={{ maxWidth: 260, marginBottom: 12 }}>
+        <label className="field__label">Фільтр статусу</label>
+        <select className="select" value={runFilter} onChange={(e) => setRunFilter(e.target.value)}>
+          <option value="">Усі статуси</option>
+          {Object.entries(RUN_STATUS_LABELS).map(([key, label]) => (
+            <option key={key} value={key}>{label}</option>
+          ))}
+        </select>
+      </div>
       {loading ? (
         <p className="empty-hint">Завантаження…</p>
       ) : (
@@ -156,7 +188,7 @@ export default function ReportsPage() {
               </tr>
             </thead>
             <tbody>
-              {runs.map((run) => (
+              {runsVisible.map((run) => (
                 <tr key={run.id}>
                   <td>#{run.id}</td>
                   <td>
@@ -173,9 +205,9 @@ export default function ReportsPage() {
                   </td>
                 </tr>
               ))}
-              {runs.length === 0 && (
+              {runsVisible.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="empty-hint">Прогонів пошуку ще немає.</td>
+                  <td colSpan={6} className="empty-hint">Прогонів пошуку з цим статусом немає.</td>
                 </tr>
               )}
             </tbody>
@@ -189,6 +221,7 @@ export default function ReportsPage() {
           <thead>
             <tr>
               <th>ID</th>
+              <th>Тип</th>
               <th>Файл</th>
               <th>Замовлень</th>
               <th>Створено</th>
@@ -199,17 +232,23 @@ export default function ReportsPage() {
             {reports.map((report) => (
               <tr key={report.id}>
                 <td>#{report.id}</td>
+                <td>{TYPE_LABELS[report.report_type] || report.report_type || 'Прогін'}</td>
                 <td>{report.file_name}</td>
                 <td>{report.orders_total ?? '—'}</td>
                 <td>{formatDate(report.created_at)}</td>
                 <td>
-                  <a className="button" href={`/api/reports/${report.id}/download`}>Завантажити</a>
+                  <div className="row-actions">
+                    <a className="button" href={`/api/reports/${report.id}/download`}>Завантажити</a>
+                    <button className="button button--danger" type="button" disabled={busyReport === report.id} onClick={() => removeReport(report)}>
+                      {busyReport === report.id ? '…' : 'Видалити'}
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
             {reports.length === 0 && (
               <tr>
-                <td colSpan={5} className="empty-hint">Ще не згенеровано жодного PDF.</td>
+                <td colSpan={6} className="empty-hint">Ще не згенеровано жодного PDF.</td>
               </tr>
             )}
           </tbody>

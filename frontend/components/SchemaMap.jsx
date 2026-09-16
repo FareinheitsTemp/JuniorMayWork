@@ -8,20 +8,41 @@ const TABLES = {
   source_channels: { title: 'source_channels', fields: ['id PK', 'source_id FK', 'handle', 'enabled'] },
   source_runs: { title: 'source_runs', fields: ['id PK', 'source_id FK', 'outcome', 'discovered_count', 'inserted_count'] },
   branches: { title: 'branches', fields: ['id PK', 'name', 'keywords[]', 'max_budget_cents', 'is_active'] },
-  orders: { title: 'orders', fields: ['id PK', 'source + external_id', 'branch_id FK', 'priority_score', 'freshness_score', 'status'] },
-  applications: { title: 'applications', fields: ['id PK', 'order_id FK', 'order_title', 'result', 'applied_at'] },
+  orders: { title: 'orders', fields: ['id PK', 'source + external_id', 'branch_id FK', 'status_id FK', 'priority_score', 'freshness_score'] },
+  applications: { title: 'applications', fields: ['id PK', 'order_id FK', 'result', 'applied_at'] },
   events: { title: 'events', fields: ['id PK', 'order_id FK', 'type', 'payload JSONB', 'created_at'] },
-  search_profiles: { title: 'search_profiles', fields: ['id PK', 'name', 'is_active', 'criteria JSONB', 'created_at'] },
+  order_statuses: { title: 'order_statuses · довідник', fields: ['id PK', 'key', 'label', 'color', 'is_terminal'] },
+  order_status_history: { title: 'order_status_history', fields: ['id PK', 'order_id FK', 'from/to_status FK', 'actor', 'changed_at'] },
+  order_notes: { title: 'order_notes', fields: ['id PK', 'order_id FK', 'body', 'created_at'] },
+  order_skills: { title: 'order_skills · M:N', fields: ['order_id FK', 'skill_id FK'] },
+  skills: { title: 'skills · довідник', fields: ['id PK', 'name', 'slug'] },
+  application_results: { title: 'application_results · довідник', fields: ['id PK', 'key', 'label'] },
+  tags: { title: 'tags · довідник', fields: ['id PK', 'name'] },
+  search_profiles: { title: 'search_profiles', fields: ['id PK', 'name', 'is_active', 'criteria JSONB', 'interval / budget / age'] },
+  search_profile_tags: { title: 'search_profile_tags', fields: ['id PK', 'profile_id FK', 'tag', 'tag_type'] },
+  search_profile_sources: { title: 'search_profile_sources', fields: ['profile_id FK', 'source_id FK', 'is_enabled'] },
   search_runs: { title: 'search_runs', fields: ['id PK', 'profile_id FK', 'status', 'stats JSONB', 'started_at / finished_at'] },
-  reports: { title: 'reports', fields: ['id PK', 'search_run_id FK', 'file_name', 'storage_key', 'orders_total', 'summary_json'] },
+  order_discoveries: { title: 'order_discoveries', fields: ['id PK', 'search_run_id FK', 'order_id FK', 'relevance_score', 'captured_at'] },
+  reports: { title: 'reports', fields: ['id PK', 'search_run_id FK', 'report_type', 'file_name', 'orders_total', 'summary_json'] },
+  report_downloads: { title: 'report_downloads', fields: ['id PK', 'report_id FK', 'downloaded_at', 'user_agent'] },
+  search_run_daily_stats: { title: 'search_run_daily_stats', fields: ['run_date + source_id', 'orders_found', 'runs_count'] },
+  audit_log: { title: 'audit_log', fields: ['id PK', 'entity + entity_id', 'action', 'payload JSONB', 'created_at'] },
   schema_nodes: { title: 'schema_nodes · UI meta', fields: ['id PK', 'layout_id FK', 'table_key', 'x / y', 'width / height'] },
 };
 
 const EDGES = [
   ['sources', 'source_channels', 'relation'], ['sources', 'source_runs', 'relation'],
   ['source_runs', 'orders', 'ingest'], ['branches', 'orders', 'relation'],
+  ['order_statuses', 'orders', 'relation'],
   ['orders', 'applications', 'relation'], ['orders', 'events', 'relation'],
-  ['search_profiles', 'search_runs', 'relation'], ['search_runs', 'reports', 'relation'],
+  ['orders', 'order_notes', 'relation'], ['orders', 'order_status_history', 'relation'],
+  ['orders', 'order_skills', 'relation'], ['skills', 'order_skills', 'relation'],
+  ['search_profiles', 'search_profile_tags', 'relation'],
+  ['search_profiles', 'search_profile_sources', 'relation'], ['sources', 'search_profile_sources', 'relation'],
+  ['search_profiles', 'search_runs', 'relation'], ['search_runs', 'order_discoveries', 'relation'],
+  ['orders', 'order_discoveries', 'relation'],
+  ['search_runs', 'reports', 'relation'], ['reports', 'report_downloads', 'relation'],
+  ['sources', 'search_run_daily_stats', 'relation'],
 ];
 
 const CANVAS_W = 1320;
@@ -41,10 +62,10 @@ function statusColor(status) {
 
 function edgePath(from, to) {
   const x1 = Number(from.x) + Number(from.width);
-  const y1 = Number(from.y) + 77;
+  const y1 = Number(from.y) + 44;
   const x2 = Number(to.x);
   const y2 = Number(to.y) + 44;
-  const bend = Math.max(30, Math.min(90, Math.abs(y2 - y1) / 4 + 24));
+  const bend = Math.max(30, Math.min(90, Math.abs(y2 - y1) / 2 + 24));
   return `M ${x1} ${y1} C ${x1} ${y1 + bend}, ${x2} ${y2 - bend}, ${x2} ${y2}`;
 }
 
