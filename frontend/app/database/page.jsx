@@ -5,25 +5,25 @@ import DataTable from '@/components/DataTable';
 import '@/styles/blocks/grid-extra.scss';
 
 const TABLE_LABELS = {
-  sources: 'Джерела',
-  source_channels: 'Канали джерел',
-  source_runs: 'Прогони джерел',
-  branches: 'Вітки',
-  orders: 'Замовлення',
-  applications: 'Заявки',
-  events: 'Події',
-  search_profiles: 'Профілі пошуку',
-  search_runs: 'Прогони пошуку',
-  reports: 'Звіти',
-  order_statuses: 'Статуси замовлень',
-  application_results: 'Результати заявок',
-  skills: 'Навички',
-  tags: 'Теги',
-  order_notes: 'Нотатки до замовлень',
-  order_status_history: 'Історія статусів',
-  audit_log: 'Журнал аудиту',
-  report_downloads: 'Завантаження звітів',
-  search_run_daily_stats: 'Щоденна статистика',
+  sources: 'Джерела (sources)',
+  source_channels: 'Канали джерел (source_channels)',
+  source_runs: 'Прогони джерел (source_runs)',
+  branches: 'Вітки (branches)',
+  orders: 'Замовлення (orders)',
+  applications: 'Заявки (applications)',
+  events: 'Події (events)',
+  search_profiles: 'Профілі пошуку (search_profiles)',
+  search_runs: 'Прогони пошуку (search_runs)',
+  reports: 'Звіти (reports)',
+  order_statuses: 'Статуси (order_statuses)',
+  application_results: 'Результати заявок (app_results)',
+  skills: 'Навички (skills)',
+  tags: 'Теги (tags)',
+  order_notes: 'Нотатки (order_notes)',
+  order_status_history: 'Історія статусів (status_history)',
+  audit_log: 'Журнал аудиту (audit_log)',
+  report_downloads: 'Завантаження (report_downloads)',
+  search_run_daily_stats: 'Щоденна стат (daily_stats)',
 };
 
 async function gridRequest(path, options = {}) {
@@ -51,7 +51,7 @@ function inputType(column) {
 
 function formatCell(value) {
   if (value === null || value === undefined) return '—';
-  if (typeof value === 'boolean') return value ? 'так' : 'ні';
+  if (typeof value === 'boolean') return value ? 'TRUE' : 'FALSE';
   if (typeof value === 'object') return JSON.stringify(value);
   return String(value);
 }
@@ -174,7 +174,11 @@ export default function DatabasePage() {
       key: column.name,
       label: column.name,
       sortValue: (row) => row[column.name],
-      render: (row) => formatCell(row[column.name]),
+      render: (row) => (
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12.5 }}>
+          {formatCell(row[column.name])}
+        </span>
+      ),
     })),
     {
       key: '__actions',
@@ -182,21 +186,29 @@ export default function DatabasePage() {
       sortable: false,
       render: (row) => (
         <div className="row-actions">
-          <button className="button" type="button" onClick={() => startEdit(row)}>Редагувати</button>
-          <button className="button button--danger" type="button" onClick={() => removeRow(row)}>Видалити</button>
+          <button className="button button--sm" type="button" onClick={() => startEdit(row)}>✎ Редагувати</button>
+          <button className="button button--danger button--sm" type="button" onClick={() => removeRow(row)}>✕</button>
         </div>
       ),
     },
   ];
 
   return (
-    <div>
-      <div className="page__head">
-        <h1 className="page__title">Керування базою даних</h1>
-        <p className="page__subtitle">Перегляд і редагування таблиць — виберіть таблицю нижче.</p>
+    <section className="page">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent)', fontSize: 13, fontWeight: 600 }}>›_</span>
+            <h1 className="page__title">SQL Data Grid</h1>
+          </div>
+          <p className="page__subtitle">Прямий доступ до 19 таблиць бази даних v2: селектор, пошук, пагінація, CRUD-редагування.</p>
+        </div>
+        <button className="button button--primary" type="button" disabled={busy || !columns.length} onClick={startCreate}>
+          + Додати рядок
+        </button>
       </div>
 
-      <div className="tabs" style={{ marginBottom: 18 }}>
+      <div className="tabs" style={{ marginBottom: 18, borderBottom: '1px solid var(--line)' }}>
         {tables.map((name) => (
           <button
             key={name}
@@ -209,28 +221,35 @@ export default function DatabasePage() {
         ))}
       </div>
 
-      {error && <p style={{ color: 'var(--bad)' }}>{error}</p>}
+      {error && <div className="toast" onClick={() => setError('')}>{error}</div>}
 
-      {loading ? (
-        <p className="empty-hint">Завантаження даних…</p>
-      ) : (
-        <DataTable
-          columns={tableColumns}
-          rows={rows}
-          pageSize={20}
-          empty="У цій таблиці ще немає рядків."
-          toolbar={
-            <button className="button" type="button" disabled={busy || !columns.length} onClick={startCreate}>
-              + Додати рядок
-            </button>
-          }
-        />
-      )}
+      <div className="grid__scroll">
+        {loading ? (
+          <div className="skeleton-list" style={{ padding: 16 }}>
+            <div className="skeleton" />
+            <div className="skeleton" />
+            <div className="skeleton" />
+          </div>
+        ) : (
+          <DataTable
+            columns={tableColumns}
+            rows={rows}
+            pageSize={25}
+            empty="У цій таблиці ще немає рядків."
+          />
+        )}
+      </div>
 
       {showForm && (
         <div className="modal-overlay" onClick={closeForm}>
           <div className="modal-card" onClick={(event) => event.stopPropagation()}>
-            <h2>{creating ? `Новий рядок — ${TABLE_LABELS[table] || table}` : `Рядок #${editing.id}`}</h2>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--line)', paddingBottom: 10, marginBottom: 14 }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--accent)' }}>
+                {creating ? `INSERT INTO ${table}` : `UPDATE ${table} WHERE id = ${editing.id}`}
+              </span>
+              <button className="button button--sm" type="button" onClick={closeForm}>✕</button>
+            </div>
+
             {formColumns.map((column) => (
               <label key={column.name} className={`field ${inputType(column) === 'checkbox' ? 'field--checkbox' : ''}`}>
                 {inputType(column) === 'checkbox' ? (
@@ -240,11 +259,13 @@ export default function DatabasePage() {
                       checked={!!draft[column.name]}
                       onChange={(event) => setDraft({ ...draft, [column.name]: event.target.checked })}
                     />
-                    {column.name} <span className="field__hint">({column.type})</span>
+                    <span style={{ fontFamily: 'var(--font-mono)' }}>{column.name}</span>
+                    <span className="field__hint">({column.type})</span>
                   </>
                 ) : (
                   <>
-                    {column.name} <span className="field__hint">({column.type})</span>
+                    <span style={{ fontFamily: 'var(--font-mono)' }}>{column.name}</span>
+                    <span className="field__hint">({column.type})</span>
                     {inputType(column) === 'textarea' ? (
                       <textarea
                         className="textarea"
@@ -264,12 +285,12 @@ export default function DatabasePage() {
               </label>
             ))}
             <div className="modal-card__actions">
-              <button className="button" type="button" disabled={busy} onClick={saveForm}>Зберегти</button>
               <button className="button" type="button" onClick={closeForm}>Скасувати</button>
+              <button className="button button--primary" type="button" disabled={busy} onClick={saveForm}>Зберегти зміни</button>
             </div>
           </div>
         </div>
       )}
-    </div>
+    </section>
   );
 }

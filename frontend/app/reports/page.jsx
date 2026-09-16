@@ -6,11 +6,11 @@ import Donut from '@/components/Donut';
 import '@/styles/blocks/grid-extra.scss';
 
 const RUN_STATUS_LABELS = {
-  queued: 'у черзі',
-  running: 'виконується',
-  completed: 'завершено',
-  partial: 'частково',
-  failed: 'помилка',
+  queued: 'QUEUED',
+  running: 'RUNNING',
+  completed: 'DONE',
+  partial: 'PARTIAL',
+  failed: 'FAILED',
 };
 
 const RUN_STATUS_DOT = {
@@ -22,16 +22,16 @@ const RUN_STATUS_DOT = {
 };
 
 const RUN_STATUS_COLORS = {
-  queued: 'var(--text-dim)',
+  queued: 'var(--text-muted)',
   running: 'var(--warn)',
   completed: 'var(--good)',
-  partial: 'var(--warn)',
+  partial: 'var(--accent)',
   failed: 'var(--bad)',
 };
 
 const TYPE_LABELS = {
-  run: 'Прогін',
-  summary: 'Зведення',
+  run: 'RUN',
+  summary: 'SUMMARY',
 };
 
 async function request(path, options = {}) {
@@ -56,7 +56,6 @@ function formatDate(value) {
   return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString('uk-UA');
 }
 
-// Звіти: зведення, прогони пошуку з генерацією PDF і керування готовими звітами.
 export default function ReportsPage() {
   const [summary, setSummary] = useState(null);
   const [runs, setRuns] = useState([]);
@@ -128,26 +127,27 @@ export default function ReportsPage() {
     .filter((part) => part.value > 0);
 
   return (
-    <div>
-      <div className="page__head">
-        <h1 className="page__title">Звіти</h1>
-        <p className="page__subtitle">Зведення по замовленнях та PDF-звіти прогонів пошуку.</p>
+    <section className="page">
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent)', fontSize: 13, fontWeight: 600 }}>›_</span>
+        <h1 className="page__title">Звіти та аналітика</h1>
       </div>
+      <p className="page__subtitle">Генерація багатосторінкових PDF-звітів, аналітика прогонів і архів експортів.</p>
 
-      {error && <p style={{ color: 'var(--bad)' }}>{error}</p>}
+      {error && <div className="toast" onClick={() => setError('')}>{error}</div>}
 
       <div className="stat-row">
         <div className="card"><StatCard label="Замовлень усього" value={summary ? (summary.total_orders ?? '—') : '…'} /></div>
         <div className="card"><StatCard label="Прогонів пошуку" value={runs.length} /></div>
-        <div className="card"><StatCard label="PDF-звітів" value={reports.length} /></div>
+        <div className="card"><StatCard label="Готових PDF" value={reports.length} /></div>
         {statusParts.length > 0 && (
           <div className="donut-card">
-            <Donut parts={statusParts} size={110} />
+            <Donut parts={statusParts} size={96} strokeWidth={12} />
             <div className="donut-card__legend">
               {statusParts.map((part) => (
                 <div key={part.label} className="donut-card__legend-item">
                   <span className="status-dot" style={{ background: part.color }} />
-                  {part.label}: {part.value}
+                  <span>{part.label}: <strong>{part.value}</strong></span>
                 </div>
               ))}
             </div>
@@ -157,50 +157,72 @@ export default function ReportsPage() {
 
       {lastReport && (
         <div className="report-banner">
-          <strong>PDF готовий:</strong> {lastReport.file_name}
-          <a className="button" href={lastReport.download}>Завантажити</a>
+          <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--good)' }}>● PDF_READY</span>
+          <strong style={{ flex: 1 }}>{lastReport.file_name}</strong>
+          <a className="button button--primary button--sm" href={lastReport.download}>
+            Завантажити PDF ↗
+          </a>
         </div>
       )}
 
-      <h2 className="section-title">Прогони пошуку</h2>
-      <div className="field" style={{ maxWidth: 260, marginBottom: 12 }}>
-        <label className="field__label">Фільтр статусу</label>
-        <select className="select" value={runFilter} onChange={(e) => setRunFilter(e.target.value)}>
-          <option value="">Усі статуси</option>
-          {Object.entries(RUN_STATUS_LABELS).map(([key, label]) => (
-            <option key={key} value={key}>{label}</option>
-          ))}
-        </select>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '24px 0 10px' }}>
+        <h2 className="section-title" style={{ margin: 0 }}>Прогони пошуку (Search Runs)</h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-muted)' }}>filter:</span>
+          <select className="select" style={{ padding: '4px 8px', fontSize: 12, fontFamily: 'var(--font-mono)' }} value={runFilter} onChange={(e) => setRunFilter(e.target.value)}>
+            <option value="">ALL_STATUSES</option>
+            {Object.entries(RUN_STATUS_LABELS).map(([key, label]) => (
+              <option key={key} value={key}>{label}</option>
+            ))}
+          </select>
+        </div>
       </div>
+
       {loading ? (
-        <p className="empty-hint">Завантаження…</p>
+        <div className="skeleton-list">
+          <div className="skeleton" />
+          <div className="skeleton" />
+        </div>
       ) : (
-        <div className="grid__scroll">
+        <div className="grid__scroll" style={{ marginBottom: 28 }}>
           <table className="table">
             <thead>
               <tr>
-                <th>ID</th>
+                <th style={{ width: 60 }}>Run ID</th>
                 <th>Статус</th>
-                <th>Почато</th>
+                <th>Час старту</th>
                 <th>Завершено</th>
                 <th>Знайдено</th>
-                <th>PDF</th>
+                <th style={{ textAlign: 'right' }}>Дія</th>
               </tr>
             </thead>
             <tbody>
               {runsVisible.map((run) => (
                 <tr key={run.id}>
-                  <td>#{run.id}</td>
+                  <td style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>#{run.id}</td>
                   <td>
                     <span className={`status-dot status-dot--${RUN_STATUS_DOT[run.status] || 'idle'}`} />
-                    {RUN_STATUS_LABELS[run.status] || run.status || '—'}
+                    <span style={{
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: RUN_STATUS_DOT[run.status] === 'ok' ? 'var(--good)' : RUN_STATUS_DOT[run.status] === 'bad' ? 'var(--bad)' : 'var(--warn)',
+                    }}>
+                      {RUN_STATUS_LABELS[run.status] || run.status || '—'}
+                    </span>
                   </td>
-                  <td>{formatDate(run.started_at)}</td>
-                  <td>{formatDate(run.finished_at)}</td>
-                  <td>{run.orders_found ?? '—'}</td>
-                  <td>
-                    <button className="button" type="button" disabled={busyRun === run.id} onClick={() => generatePDF(run)}>
-                      {busyRun === run.id ? 'Генерується…' : 'Згенерувати PDF'}
+                  <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-dim)' }}>
+                    {formatDate(run.started_at)}
+                  </td>
+                  <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-muted)' }}>
+                    {formatDate(run.finished_at)}
+                  </td>
+                  <td style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 600 }}>
+                    {run.orders_found ?? '—'}
+                  </td>
+                  <td style={{ textAlign: 'right' }}>
+                    <button className="button button--primary button--sm" type="button" disabled={busyRun === run.id} onClick={() => generatePDF(run)}>
+                      {busyRun === run.id ? 'Генерація…' : 'Згенерувати PDF'}
                     </button>
                   </td>
                 </tr>
@@ -215,32 +237,42 @@ export default function ReportsPage() {
         </div>
       )}
 
-      <h2 className="section-title">Готові PDF-звіти</h2>
+      <h2 className="section-title">Згенеровані PDF-звіти (Archive)</h2>
       <div className="grid__scroll">
         <table className="table">
           <thead>
             <tr>
-              <th>ID</th>
+              <th style={{ width: 60 }}>id</th>
               <th>Тип</th>
-              <th>Файл</th>
+              <th>Файл звіту</th>
               <th>Замовлень</th>
               <th>Створено</th>
-              <th />
+              <th style={{ textAlign: 'right' }}>Дії</th>
             </tr>
           </thead>
           <tbody>
             {reports.map((report) => (
               <tr key={report.id}>
-                <td>#{report.id}</td>
-                <td>{TYPE_LABELS[report.report_type] || report.report_type || 'Прогін'}</td>
-                <td>{report.file_name}</td>
-                <td>{report.orders_total ?? '—'}</td>
-                <td>{formatDate(report.created_at)}</td>
+                <td style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>#{report.id}</td>
                 <td>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, padding: '2px 6px', background: 'var(--bg-soft)', borderRadius: 'var(--radius-sm)', color: 'var(--accent)' }}>
+                    {TYPE_LABELS[report.report_type] || report.report_type || 'RUN'}
+                  </span>
+                </td>
+                <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12.5 }}>
+                  {report.file_name}
+                </td>
+                <td style={{ fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 600 }}>
+                  {report.orders_total ?? '—'}
+                </td>
+                <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-dim)' }}>
+                  {formatDate(report.created_at)}
+                </td>
+                <td style={{ textAlign: 'right' }}>
                   <div className="row-actions">
-                    <a className="button" href={`/api/reports/${report.id}/download`}>Завантажити</a>
-                    <button className="button button--danger" type="button" disabled={busyReport === report.id} onClick={() => removeReport(report)}>
-                      {busyReport === report.id ? '…' : 'Видалити'}
+                    <a className="button button--sm" href={`/api/reports/${report.id}/download`}>Завантажити</a>
+                    <button className="button button--danger button--sm" type="button" disabled={busyReport === report.id} onClick={() => removeReport(report)}>
+                      {busyReport === report.id ? '…' : '✕'}
                     </button>
                   </div>
                 </td>
@@ -248,12 +280,12 @@ export default function ReportsPage() {
             ))}
             {reports.length === 0 && (
               <tr>
-                <td colSpan={6} className="empty-hint">Ще не згенеровано жодного PDF.</td>
+                <td colSpan={6} className="empty-hint">Ще не згенеровано жодного PDF-звіту.</td>
               </tr>
             )}
           </tbody>
         </table>
       </div>
-    </div>
+    </section>
   );
 }
