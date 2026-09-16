@@ -69,7 +69,7 @@ export default function DashboardPage() {
   const maxDaily = Math.max(1, ...daily.map((p) => p.count));
   const statusParts = ((data && data.statuses) || [])
     .filter((s) => s.count > 0)
-    .map((s) => ({ label: s.label, value: s.count, color: s.color || '#8f9cb2' }));
+    .map((s) => ({ label: s.label, value: s.count, color: s.color || 'var(--text-dim)' }));
   const totals = (data && data.totals) || {};
 
   return (
@@ -81,10 +81,14 @@ export default function DashboardPage() {
         </div>
         <button className="button" type="button" onClick={load}>Оновити</button>
       </div>
-      {error && <p style={{ color: 'var(--bad)' }}>{error}</p>}
+      {error && <div className="toast" onClick={() => setError('')}>{error}</div>}
 
       {loading && !data ? (
-        <p className="empty-hint">Завантаження…</p>
+        <div className="skeleton-list">
+          <div className="skeleton" />
+          <div className="skeleton" />
+          <div className="skeleton" />
+        </div>
       ) : (
         <>
           <div className="stat-row">
@@ -114,16 +118,17 @@ export default function DashboardPage() {
               <p className="empty-hint">Даних ще немає — запусти збір на сторінці «Налаштування».</p>
             ) : (
               <div>
-                <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 110 }}>
+                <div className="dash-chart">
                   {daily.map((p) => (
                     <div
                       key={p.day}
+                      className="dash-chart__bar"
                       title={`${p.day}: ${p.count}`}
-                      style={{ flex: 1, background: 'var(--accent, #2f6fed)', height: `${Math.max(2, (p.count / maxDaily) * 100)}%`, minHeight: 2, borderRadius: 2 }}
+                      style={{ height: `${Math.max(2, (p.count / maxDaily) * 100)}%` }}
                     />
                   ))}
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-dim)', marginTop: 6 }}>
+                <div className="dash-chart__axis">
                   <span>{(daily[0] && daily[0].day || '').slice(5)}</span>
                   <span>макс за добу: {maxDaily}</span>
                   <span>{(daily[daily.length - 1] && daily[daily.length - 1].day || '').slice(5)}</span>

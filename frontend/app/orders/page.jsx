@@ -143,7 +143,7 @@ export default function OrdersPage() {
     <section className="page">
       <h1 className="page__title">Замовлення</h1>
       <p className="page__subtitle">Пріоритетний список знайдених замовлень: нотатки, історія і зміна статусів.</p>
-      {error && <p className="page__hint">{error}</p>}
+      {error && <div className="toast" onClick={() => setError('')}>{error}</div>}
 
       <div className="tabs">
         <button type="button" className={`tab ${statusFilter === '' ? 'tab--active' : ''}`} onClick={() => setStatusFilter('')}>Усі</button>
@@ -160,7 +160,11 @@ export default function OrdersPage() {
 
       <div className="card">
         {loading ? (
-          <p className="page__hint">Завантаження…</p>
+          <div className="skeleton-list">
+            <div className="skeleton" />
+            <div className="skeleton" />
+            <div className="skeleton" />
+          </div>
         ) : (
           <table className="table">
             <thead>
@@ -187,7 +191,7 @@ export default function OrdersPage() {
                     <td>{row.source || '—'}</td>
                     <td>{money(row.budget_cents, row.currency)}</td>
                     <td>
-                      <span className="status-dot" style={{ background: (st && st.color) || '#8f9cb2' }} />
+                      <span className="status-dot" style={{ background: (st && st.color) || 'var(--text-dim)' }} />
                       {' '}{(st && st.label) || row.status || '—'}
                     </td>
                     <td>{formatDate(row.first_seen_at)}</td>
@@ -196,7 +200,7 @@ export default function OrdersPage() {
               })}
               {visible.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="page__hint">Замовлень не знайдено.</td>
+                  <td colSpan={6} className="empty-hint">Замовлень не знайдено.</td>
                 </tr>
               )}
             </tbody>
@@ -208,7 +212,7 @@ export default function OrdersPage() {
         <div className="modal-overlay" onClick={closeOrder}>
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
             <h2 style={{ marginTop: 0, fontSize: 18 }}>{selected.title || `Замовлення #${selected.id}`}</h2>
-            <p style={{ color: '#8b95a8', fontSize: 13 }}>
+            <p style={{ color: 'var(--text-dim)', fontSize: 13 }}>
               #{selected.id} · {selected.source || '—'} · {money(selected.budget_cents, selected.currency)} · {formatDate(selected.first_seen_at)}
             </p>
             {selected.url && (
@@ -236,11 +240,11 @@ export default function OrdersPage() {
               {((detail && detail.notes) || []).map((note) => (
                 <li key={note.id} className="card" style={{ marginBottom: 8, padding: '8px 10px' }}>
                   <div style={{ fontSize: 13 }}>{note.body}</div>
-                  <div style={{ fontSize: 11, color: '#8b95a8' }}>{formatDate(note.created_at)}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{formatDate(note.created_at)}</div>
                 </li>
               ))}
               {((detail && detail.notes) || []).length === 0 && (
-                <li className="page__hint">Нотаток ще немає.</li>
+                <li className="empty-hint">Нотаток ще немає.</li>
               )}
             </ul>
 
@@ -248,17 +252,17 @@ export default function OrdersPage() {
             <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
               {((detail && detail.history) || []).map((change) => (
                 <li key={change.id} style={{ marginBottom: 6, fontSize: 13 }}>
-                  <span className="status-dot" style={{ background: (statusByKey[change.to_status] && statusByKey[change.to_status].color) || '#8f9cb2' }} />
+                  <span className="status-dot" style={{ background: (statusByKey[change.to_status] && statusByKey[change.to_status].color) || 'var(--text-dim)' }} />
                   {' '}{change.from_status ? `${change.from_status} → ` : ''}{change.to_status}
                   {' · '}{formatDate(change.changed_at)}{change.actor ? ` · ${change.actor}` : ''}
                 </li>
               ))}
               {((detail && detail.history) || []).length === 0 && (
-                <li className="page__hint">Змін статусу ще не було.</li>
+                <li className="empty-hint">Змін статусу ще не було.</li>
               )}
             </ul>
 
-            <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+            <div className="modal-card__actions">
               <button className="button" type="button" onClick={closeOrder}>Закрити</button>
             </div>
           </div>

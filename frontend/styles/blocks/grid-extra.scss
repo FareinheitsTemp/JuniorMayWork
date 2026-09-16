@@ -1,6 +1,7 @@
-// Додаткові стилі для сторінок /database та /reports: модалка редагування,
-// кольорові маркери статусу і банер готового звіту. Доповнює db.scss —
-// нічого не перевизначає, лише додає нові класи.
+// Додаткові стилі для сторінок /database, /reports, /orders та дашборда:
+// модалка редагування, кольорові маркери статусу, банер готового звіту,
+// стовпчикова динаміка і скелетони. Доповнює db.scss — нічого не
+// перевизначає, лише додає нові класи.
 
 .modal-overlay {
   position: fixed;
@@ -15,7 +16,7 @@
 
 .modal-card {
   background: var(--card);
-  border: 2px solid var(--line);
+  border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: 22px;
   width: 100%;
@@ -94,12 +95,12 @@
   gap: 14px;
   flex-wrap: wrap;
   align-items: stretch;
-  margin-bottom: 70px;
+  margin-bottom: 20px;
 }
 
 .stat-row .card {
   background: var(--card);
-  border: 0.3px solid var(--line);
+  border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: 14px 18px;
 }
@@ -159,4 +160,63 @@
   color: var(--text-dim);
   font-size: 13px;
   padding: 14px 4px;
+}
+
+// Дашборд: стовпчикова динаміка надходжень за 30 днів.
+.dash-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 110px;
+}
+
+.dash-chart__bar {
+  flex: 1;
+  min-height: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+  transition: height 0.2s ease;
+}
+
+.dash-chart__axis {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+// Скелетон завантаження.
+.skeleton {
+  height: 14px;
+  border-radius: var(--radius);
+  background: linear-gradient(90deg, var(--card) 25%, var(--card-hover, #1c2330) 50%, var(--card) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease infinite;
+}
+
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.skeleton-list {
+  display: grid;
+  gap: 8px;
+}
+
+// Тост помилок (клік — закрити).
+.toast {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 200;
+  max-width: 380px;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  background: var(--bad);
+  color: #fff;
+  font-size: 13px;
+  cursor: pointer;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
 }
