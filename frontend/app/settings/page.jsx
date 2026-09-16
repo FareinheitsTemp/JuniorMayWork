@@ -1,143 +1,194 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { radar } from '@/lib/radar';
-import { useLive } from '@/lib/useLive';
+import { TerminalIcon, RefreshIcon } from '@/components/Icons';
+import '@/styles/blocks/grid-extra.scss';
 
 const OUTCOME = {
-  success: { label: 'працює', cls: 'success' },
-  failure: { label: 'помилка', cls: 'failure' },
-  warning: { label: 'частково', cls: 'warning' },
-  running: { label: 'виконується', cls: 'running' },
+  success: { label: 'ONLINE', dot: 'ok' },
+  warning: { label: 'WARN', dot: 'warn' },
+  failure: { label: 'FAIL', dot: 'bad' },
+  running: { label: 'POLLING', dot: 'warn' },
 };
 
-function ago(value) {
-  if (!value) return '—';
-  const minutes = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 60000));
-  if (minutes < 1) return 'щойно';
-  if (minutes < 60) return `${minutes} хв тому`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} год тому`;
-  return `${Math.floor(hours / 24)} дн тому`;
+function formatDate(val) {
+  if (!val) return '—';
+  const d = new Date(val);
+  return Number.isNaN(d.getTime()) ? String(val) : d.toLocaleString('uk-UA');
 }
 
 export default function SettingsPage() {
-  const [runs, setRuns] = useState([]);
-  const [busy, setBusy] = useState(false);
-  const [flash, setFlash] = useState('');
+  const [sources, setSources] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [flash, setFlash] = useState('');
+  const [runningKey, setRunningKey] = useState(null);
 
   const load = useCallback(async () => {
+    setLoading(true);
     try {
-      setRuns(await radar.runs(60));
+      const list = await api.sources();
+      const withRuns = await Promise.all(
+        list.map(async (s) => {
+          try {
+            const runs = await radar.sourceRuns(s.id, 1);
+            return { ...s, last: runs[0] || null };
+          } catch {
+            return { ...s, last: null };
+          }
+        })
+      );
+      setSources(withRuns);
       setError('');
-    } catch (e) {
-      setError(e.message);
+    } catch (err) {
+      setError(`Не вдалося завантажити джерела: ${err.message}`);
+    } finally {
+      setLoading(false);
     }
   }, []);
 
   useEffect(() => {
     load();
-    const timer = setInterval(load, 30000);
-    return () => clearInterval(timer);
   }, [load]);
 
-  useLive((event) => {
-    if (event.type === 'new') load();
-  });
-
-  async function runNow() {
-    setBusy(true);
+  async function triggerRun(s) {
+    setRunningKey(s.key);
     try {
-      await api.scraperRun();
-      setFlash('Збір запущено');
-      setTimeout(load, 4000);
-    } catch (e) {
-      setFlash(`Помилка: ${e.message}`);
+      const res = await api.triggerSource(s.key);
+      setFlash(`Запуск ${s.name}: знайдено ${res.discovered}, нових ${res.inserted}`);
+      await load();
+    } catch (err) {
+      setError(`Помилка запуску: ${err.message}`);
     } finally {
-      setBusy(false);
+      setRunningKey(null);
     }
   }
 
-  const sources = useMemo(() => {
-    const map = new Map();
-    for (const run of runs || []) {
-      if (!map.has(run.source_id)) map.set(run.source_id, []);
-      map.get(run.source_id).push(run);
+  async function toggleSource(s) {
+    try {
+      await api.updateSource(s.id, { enabled: !s.enabled });
+      await load();
+    } catch (err) {
+      setError(`Не вдалося змінити стан: ${err.message}`);
     }
-    return [...map.entries()].map(([id, list]) => ({
-      id,
-      last: list[0],
-      total: list.length,
-      failures: list.filter((r) => r.outcome === 'failure').length,
-      discovered: list.reduce((s, r) => s + (r.discovered_count || 0), 0),
-      inserted: list.reduce((s, r) => s + (r.inserted_count || 0), 0),
-    }));
-  }, [runs]);
+  }
 
   return (
     <section className="page">
-      <div className="page__row" style={{ justifyContent: 'space-between' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
         <div>
-          <h1 className="page__title">Джерела та збір</h1>
-          <p className="page__subtitle">Health джерел, запуск збору та керування каналами</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <TerminalIcon size={18} style={{ color: 'var(--accent)' }} />
+            <h1 className="page__title">Налаштування каналів (Pipeline Config)</h1>
+          </div>
+          <p className="page__subtitle">Керування підключеннями джерел, частотою збору та ручний запуск пайплайну.</p>
         </div>
-        <div className="sources__actions">
-          <button type="button" className="button" onClick={load}>Оновити</button>
-          <button type="button" className="button button--primary" onClick={runNow} disabled={busy}>
-            {busy ? 'Запускаю…' : 'Зібрати зараз'}
-          </button>
-        </div>
+        <button className="button" type="button" onClick={load}>
+          <RefreshIcon size={14} />
+          <span>Оновити стан</span>
+        </button>
       </div>
 
-      {flash && <div className="page__hint">{flash}</div>}
-      {error && <div className="inbox__error">{error}</div>}
+      {error && <div className="toast" onClick={() => setError('')}>{error}</div>}
+      {flash && (
+        <div className="report-banner" style={{ marginBottom: 16 }}>
+          <strong style={{ color: 'var(--good)' }}>PIPELINE:</strong>
+          <span>{flash}</span>
+          <button className="button button--sm" type="button" style={{ marginLeft: 'auto' }} onClick={() => setFlash('')}>✕</button>
+        </div>
+      )}
 
-      <section className="card sources">
-        <h2 className="feed__title">Стан джерел</h2>
-        {sources.length === 0 && <p className="page__hint">Ще немає запусків — натисни «Зібрати зараз».</p>}
-        {sources.length > 0 && (
-          <table className="sources__table">
+      <div className="grid__scroll">
+        {loading ? (
+          <div className="skeleton-list" style={{ padding: 16 }}>
+            <div className="skeleton" />
+            <div className="skeleton" />
+          </div>
+        ) : (
+          <table className="table">
             <thead>
               <tr>
                 <th>Джерело</th>
-                <th>Статус</th>
-                <th>Останній запуск</th>
-                <th>Запусків</th>
-                <th>Знайдено</th>
-                <th>Нових</th>
-                <th>Помилок</th>
+                <th>Тип</th>
+                <th>Стан</th>
+                <th>Останній прогін</th>
+                <th>Телеметрія прогону</th>
+                <th style={{ textAlign: 'right' }}>Ручний запуск</th>
               </tr>
             </thead>
             <tbody>
               {sources.map((s) => {
-                const outcome = OUTCOME[s.last.outcome] || { label: s.last.outcome || '—', cls: 'warning' };
-                const when = s.last.started_at || s.last.created_at || s.last.finished_at;
+                const outcome = (s.last && OUTCOME[s.last.outcome]) || { label: 'IDLE', dot: 'idle' };
                 return (
                   <tr key={s.id}>
-                    <td className="sources__name">source #{s.id}</td>
-                    <td><span className={`sources__badge sources__badge--${outcome.cls}`}>{outcome.label}</span></td>
-                    <td>{ago(when)}</td>
-                    <td>{s.total}</td>
-                    <td>{s.discovered}</td>
-                    <td>{s.inserted}</td>
-                    <td>{s.failures > 0 ? s.failures : '—'}</td>
+                    <td>
+                      <div style={{ fontWeight: 600 }}>{s.name}</div>
+                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-muted)' }}>
+                        key: {s.key} {s.base_url ? `· ${s.base_url}` : ''}
+                      </div>
+                    </td>
+                    <td>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, padding: '2px 6px', background: 'var(--bg-soft)', borderRadius: 'var(--radius-sm)' }}>
+                        {s.kind}
+                      </span>
+                    </td>
+                    <td>
+                      <label className="field--checkbox" style={{ margin: 0 }}>
+                        <input
+                          type="checkbox"
+                          checked={s.enabled}
+                          onChange={() => toggleSource(s)}
+                        />
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5 }}>
+                          {s.enabled ? 'ENABLED' : 'PAUSED'}
+                        </span>
+                      </label>
+                    </td>
+                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-dim)' }}>
+                      {s.last ? formatDate(s.last.started_at) : '—'}
+                    </td>
+                    <td>
+                      <span className={`status-dot status-dot--${outcome.dot}`} />
+                      <span style={{
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: 11,
+                        fontWeight: 600,
+                        color: outcome.dot === 'ok' ? 'var(--good)' : outcome.dot === 'bad' ? 'var(--bad)' : 'var(--warn)',
+                        marginRight: 8,
+                      }}>
+                        {outcome.label}
+                      </span>
+                      {s.last && (
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-muted)' }}>
+                          +{s.last.discovered_count} знайдено / +{s.last.inserted_count} нових
+                        </span>
+                      )}
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      <button
+                        className="button button--primary button--sm"
+                        type="button"
+                        disabled={runningKey === s.key || !s.enabled}
+                        onClick={() => triggerRun(s)}
+                      >
+                        <RefreshIcon size={12} />
+                        <span>{runningKey === s.key ? 'Збір…' : 'Запустити'}</span>
+                      </button>
+                    </td>
                   </tr>
                 );
               })}
+              {sources.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="empty-hint">Джерел збору не налаштовано.</td>
+                </tr>
+              )}
             </tbody>
           </table>
         )}
-      </section>
-
-      <section className="card sources">
-        <h2 className="feed__title">Канали Telegram</h2>
-        <p className="page__hint">
-          Додавання й вимикання каналів з’явиться наступним комітом: потрібен CRUD на бекенді,
-          щоб список жив у базі, а не в <code>.env</code>.
-        </p>
-      </section>
+      </div>
     </section>
   );
 }
