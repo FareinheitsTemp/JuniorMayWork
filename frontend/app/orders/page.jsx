@@ -30,10 +30,9 @@ function formatDate(value) {
 function money(cents, currency) {
   if (!cents) return '—';
   const amount = (cents / 100).toLocaleString('uk-UA');
-  return currency ? `${amount} ${currency}` : amount;
+  return currency ? `${amount} ${currency}` : `$${amount}`;
 }
 
-// Замовлення: пріоритетний список + панель деталей з нотатками й історією статусів.
 export default function OrdersPage() {
   const [statuses, setStatuses] = useState([]);
   const [rows, setRows] = useState([]);
@@ -141,26 +140,34 @@ export default function OrdersPage() {
 
   return (
     <section className="page">
-      <h1 className="page__title">Замовлення</h1>
-      <p className="page__subtitle">Пріоритетний список знайдених замовлень: нотатки, історія і зміна статусів.</p>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent)', fontSize: 13, fontWeight: 600 }}>›_</span>
+        <h1 className="page__title">Каталог замовлень</h1>
+      </div>
+      <p className="page__subtitle">Пріоритетний список вакансій: інспектор деталей, Git-style історія статусів, нотатки.</p>
       {error && <div className="toast" onClick={() => setError('')}>{error}</div>}
 
       <div className="tabs">
-        <button type="button" className={`tab ${statusFilter === '' ? 'tab--active' : ''}`} onClick={() => setStatusFilter('')}>Усі</button>
-        {statuses.map((s) => (
-          <button type="button" key={s.key} className={`tab ${statusFilter === s.key ? 'tab--active' : ''}`} onClick={() => setStatusFilter(s.key)}>
-            {s.label}
-          </button>
-        ))}
+        <button type="button" className={`tab ${statusFilter === '' ? 'tab--active' : ''}`} onClick={() => setStatusFilter('')}>
+          Усі ({rows.length})
+        </button>
+        {statuses.map((s) => {
+          const count = rows.filter((r) => r.status === s.key).length;
+          return (
+            <button type="button" key={s.key} className={`tab ${statusFilter === s.key ? 'tab--active' : ''}`} onClick={() => setStatusFilter(s.key)}>
+              {s.label} <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, opacity: 0.7 }}>({count})</span>
+            </button>
+          );
+        })}
       </div>
 
-      <div className="field" style={{ marginBottom: 12 }}>
-        <input className="input" placeholder="Пошук за назвою чи джерелом…" value={search} onChange={(e) => setSearch(e.target.value)} />
+      <div className="field" style={{ marginBottom: 14 }}>
+        <input className="input" placeholder="Пошук за назвою або джерелом (фільтр на льоту)…" value={search} onChange={(e) => setSearch(e.target.value)} />
       </div>
 
-      <div className="card">
+      <div className="grid__scroll">
         {loading ? (
-          <div className="skeleton-list">
+          <div className="skeleton-list" style={{ padding: 16 }}>
             <div className="skeleton" />
             <div className="skeleton" />
             <div className="skeleton" />
@@ -169,12 +176,12 @@ export default function OrdersPage() {
           <table className="table">
             <thead>
               <tr>
-                <th>id</th>
+                <th style={{ width: 60 }}>id</th>
                 <th>Замовлення</th>
                 <th>Джерело</th>
                 <th>Бюджет</th>
                 <th>Статус</th>
-                <th>Побачено</th>
+                <th>Час надходження</th>
               </tr>
             </thead>
             <tbody>
@@ -182,19 +189,27 @@ export default function OrdersPage() {
                 const st = statusByKey[row.status];
                 return (
                   <tr key={row.id} style={{ cursor: 'pointer' }} onClick={() => openOrder(row)}>
-                    <td>#{row.id}</td>
+                    <td style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>#{row.id}</td>
                     <td>
-                      {row.url ? (
-                        <a href={row.url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>{row.title || '—'}</a>
-                      ) : (row.title || '—')}
+                      <span style={{ fontWeight: 500 }}>{row.title || '—'}</span>
                     </td>
-                    <td>{row.source || '—'}</td>
-                    <td>{money(row.budget_cents, row.currency)}</td>
                     <td>
-                      <span className="status-dot" style={{ background: (st && st.color) || 'var(--text-dim)' }} />
-                      {' '}{(st && st.label) || row.status || '—'}
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, padding: '2px 6px', background: 'var(--bg-soft)', borderRadius: 'var(--radius-sm)' }}>
+                        {row.source || '—'}
+                      </span>
                     </td>
-                    <td>{formatDate(row.first_seen_at)}</td>
+                    <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
+                      {money(row.budget_cents, row.currency)}
+                    </td>
+                    <td>
+                      <span className="status-dot" style={{ background: (st && st.color) || 'var(--text-muted)' }} />
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>
+                        {(st && st.label) || row.status || '—'}
+                      </span>
+                    </td>
+                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-dim)' }}>
+                      {formatDate(row.first_seen_at)}
+                    </td>
                   </tr>
                 );
               })}
@@ -211,59 +226,75 @@ export default function OrdersPage() {
       {selected && (
         <div className="modal-overlay" onClick={closeOrder}>
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-            <h2 style={{ marginTop: 0, fontSize: 18 }}>{selected.title || `Замовлення #${selected.id}`}</h2>
-            <p style={{ color: 'var(--text-dim)', fontSize: 13 }}>
-              #{selected.id} · {selected.source || '—'} · {money(selected.budget_cents, selected.currency)} · {formatDate(selected.first_seen_at)}
-            </p>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--line)', paddingBottom: 10, marginBottom: 14 }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--accent)' }}>
+                ORDER_INSPECTOR #{selected.id}
+              </span>
+              <button className="button button--sm" type="button" onClick={closeOrder}>✕</button>
+            </div>
+
+            <h2 style={{ fontSize: 16, lineHeight: 1.4 }}>{selected.title || `Замовлення #${selected.id}`}</h2>
+
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', margin: '10px 0 16px', fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--text-dim)' }}>
+              <span>джерело: <strong style={{ color: 'var(--text)' }}>{selected.source || '—'}</strong></span>
+              <span>·</span>
+              <span>бюджет: <strong style={{ color: 'var(--accent)' }}>{money(selected.budget_cents, selected.currency)}</strong></span>
+            </div>
+
             {selected.url && (
-              <p>
-                <a href={selected.url} target="_blank" rel="noreferrer">Відкрити джерело ↗</a>
-              </p>
+              <div style={{ marginBottom: 16 }}>
+                <a className="button button--sm" href={selected.url} target="_blank" rel="noreferrer">
+                  Відкрити на сайті джерела ↗
+                </a>
+              </div>
             )}
 
             <div className="field">
-              <label className="field__label">Статус</label>
+              <label className="field__label">Змінити статус замовлення</label>
               <select className="select" value={selected.status || ''} disabled={busy} onChange={(e) => changeStatus(selected, e.target.value)}>
-                <option value="" disabled>— оберіть статус —</option>
                 {statuses.map((s) => (
                   <option key={s.key} value={s.key}>{s.label}</option>
                 ))}
               </select>
             </div>
 
-            <h3 style={{ fontSize: 15 }}>Нотатки</h3>
+            <h3>Нотатки та коментарі</h3>
             <div className="field">
-              <textarea className="textarea" placeholder="Нова нотатка…" value={noteText} onChange={(e) => setNoteText(e.target.value)} />
-              <button className="button" type="button" disabled={busy || !noteText.trim()} onClick={() => addNote(selected)}>Додати нотатку</button>
+              <textarea className="textarea" placeholder="Додати робочу нотатку до замовлення…" value={noteText} onChange={(e) => setNoteText(e.target.value)} />
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 6 }}>
+                <button className="button button--primary" type="button" disabled={busy || !noteText.trim()} onClick={() => addNote(selected)}>
+                  + Додати нотатку
+                </button>
+              </div>
             </div>
-            <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+
+            <div style={{ display: 'grid', gap: 6, marginBottom: 16 }}>
               {((detail && detail.notes) || []).map((note) => (
-                <li key={note.id} className="card" style={{ marginBottom: 8, padding: '8px 10px' }}>
+                <div key={note.id} style={{ background: 'var(--bg-soft)', border: '1px solid var(--line)', borderRadius: 'var(--radius)', padding: '8px 12px' }}>
                   <div style={{ fontSize: 13 }}>{note.body}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{formatDate(note.created_at)}</div>
-                </li>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+                    {formatDate(note.created_at)}
+                  </div>
+                </div>
               ))}
               {((detail && detail.notes) || []).length === 0 && (
-                <li className="empty-hint">Нотаток ще немає.</li>
+                <div className="empty-hint" style={{ padding: '8px 0' }}>Нотаток ще немає.</div>
               )}
-            </ul>
+            </div>
 
-            <h3 style={{ fontSize: 15 }}>Історія статусів</h3>
-            <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+            <h3>Історія переходів (Audit Timeline)</h3>
+            <div style={{ display: 'grid', gap: 6, borderLeft: '2px solid var(--line)', paddingLeft: 12, marginLeft: 4 }}>
               {((detail && detail.history) || []).map((change) => (
-                <li key={change.id} style={{ marginBottom: 6, fontSize: 13 }}>
-                  <span className="status-dot" style={{ background: (statusByKey[change.to_status] && statusByKey[change.to_status].color) || 'var(--text-dim)' }} />
-                  {' '}{change.from_status ? `${change.from_status} → ` : ''}{change.to_status}
-                  {' · '}{formatDate(change.changed_at)}{change.actor ? ` · ${change.actor}` : ''}
-                </li>
+                <div key={change.id} style={{ fontSize: 12.5, fontFamily: 'var(--font-mono)' }}>
+                  <span className="status-dot" style={{ background: (statusByKey[change.to_status] && statusByKey[change.to_status].color) || 'var(--text-muted)' }} />
+                  <span style={{ color: 'var(--text-dim)' }}>{change.from_status ? `${change.from_status} → ` : ''}</span>
+                  <strong style={{ color: 'var(--accent)' }}>{change.to_status}</strong>
+                  <span style={{ color: 'var(--text-muted)', marginLeft: 8 }}>{formatDate(change.changed_at)}</span>
+                </div>
               ))}
               {((detail && detail.history) || []).length === 0 && (
-                <li className="empty-hint">Змін статусу ще не було.</li>
+                <div className="empty-hint" style={{ padding: '4px 0' }}>Історія чиста.</div>
               )}
-            </ul>
-
-            <div className="modal-card__actions">
-              <button className="button" type="button" onClick={closeOrder}>Закрити</button>
             </div>
           </div>
         </div>
