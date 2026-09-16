@@ -1,159 +1,173 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { api } from '@/lib/api';
-import { radar } from '@/lib/radar';
-import { useLive } from '@/lib/useLive';
 import StatCard from '@/components/StatCard';
-import EventFeed from '@/components/EventFeed';
-import NewOrderAlert from '@/components/NewOrderAlert';
 import Donut from '@/components/Donut';
-import FreshInbox from '@/components/FreshInbox';
-import { statusLabel } from '@/lib/status';
 
-const STATUS_COLORS = {
-  new: '#3fcf8e',
-  seen: '#ffb547',
-  applied: '#5b8cff',
-  won: '#2ea87a',
-  lost: '#ff6b7a',
-  archived: '#8f9cb2',
+async function request(path, options = {}) {
+  const res = await fetch(`/api${path}`, {
+    headers: { 'Content-Type': 'application/json' },
+    ...options,
+  });
+  if (!res.ok) {
+    let message = `HTTP ${res.status}`;
+    try {
+      const body = await res.json();
+      if (body && body.error) message = body.error;
+    } catch {}
+    throw new Error(message);
+  }
+  return res.json();
+}
+
+function formatDate(value) {
+  if (!value) return '—';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString('uk-UA');
+}
+
+const OUTCOME_LABELS = {
+  success: 'працює',
+  warning: 'попередження',
+  failure: 'помилка',
+  running: 'виконується',
 };
 
-function money(cents) {
-  if (cents == null) return '—';
-  return `$${(cents / 100).toFixed(0)}`;
-}
+const OUTCOME_DOT = {
+  success: 'ok',
+  warning: 'warn',
+  failure: 'bad',
+  running: 'warn',
+};
 
-function delta(current, previous) {
-  if (previous == null || previous === 0) return null;
-  return Math.round(((current - previous) / previous) * 100);
-}
-
-function todayStr(offsetDays = 0) {
-  const d = new Date();
-  d.setDate(d.getDate() + offsetDays);
-  return d.toISOString().slice(0, 10);
-}
-
-function SourcePipeline() {
-  const [runs, setRuns] = useState([]);
+// Дашборд: метрики з GET /api/dashboard (view v_daily_intake і v_source_health).
+export default function DashboardPage() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   const load = useCallback(async () => {
+    setLoading(true);
     try {
-      setRuns(await radar.runs(12));
-    } catch {
-      setRuns([]);
+      setData(await request('/dashboard'));
+      setError('');
+    } catch (err) {
+      setError(`Дані недоступні: ${err.message}`);
+    } finally {
+      setLoading(false);
     }
   }, []);
 
   useEffect(() => {
     load();
-    const timer = setInterval(load, 15000);
+    const timer = setInterval(load, 30000);
     return () => clearInterval(timer);
   }, [load]);
 
-  return (
-    <section className="pipeline card">
-      <div className="pipeline__head">
-        <h2 className="feed__title">Стан джерел</h2>
-        <span className="pipeline__live">● live</span>
-      </div>
-      <div className="pipeline__list">
-        {runs.length === 0 && <p className="page__hint">Ще немає запусків Radar.</p>}
-        {runs.slice(0, 6).map((run) => (
-          <div key={run.id} className="pipeline__run">
-            <i className={`pipeline__dot pipeline__dot--${run.outcome}`} />
-            <span className="pipeline__source">source #{run.source_id}</span>
-            <span>{run.discovered_count} знайдено</span>
-            <span>{run.inserted_count} нових</span>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-export default function DashboardPage() {
-  const [stats, setStats] = useState(null);
-  const [report, setReport] = useState(null);
-  const [busy, setBusy] = useState(false);
-  const [flash, setFlash] = useState('');
-
-  const load = useCallback(async () => {
-    try {
-      const [st, rep] = await Promise.all([
-        api.stats(),
-        api.report(todayStr(-7), todayStr()),
-      ]);
-      setStats(st);
-      setReport(rep);
-    } catch (e) {
-      setFlash(`Не вдалося завантажити дані: ${e.message}`);
-    }
-  }, []);
-
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  useLive((event) => {
-    if (event.type === 'new') load();
-  });
-
-  async function runNow() {
-    setBusy(true);
-    try {
-      await api.scraperRun();
-      setFlash('Збір запущено');
-    } catch (e) {
-      setFlash(`Помилка: ${e.message}`);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const donutParts = (report?.by_status || []).map((s) => ({
-    label: statusLabel(s.status),
-    value: s.count,
-    color: STATUS_COLORS[s.status] || '#8f9cb2',
-  }));
+  const daily = (data && data.daily) || [];
+  const maxDaily = Math.max(1, ...daily.map((p) => p.count));
+  const statusParts = ((data && data.statuses) || [])
+    .filter((s) => s.count > 0)
+    .map((s) => ({ label: s.label, value: s.count, color: s.color || '#8f9cb2' }));
+  const totals = (data && data.totals) || {};
 
   return (
     <section className="page">
-      <NewOrderAlert />
-      <div className="page__row" style={{ justifyContent: 'space-between' }}>
+      <div className="page__row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <h1 className="page__title">Радар вакансій</h1>
-          <p className="page__subtitle">Свіжі, релевантні та ще не зачеплені гіги</p>
+          <h1 className="page__title">Дашборд</h1>
+          <p className="page__subtitle">Загальна карти: замовлення, джерела і динаміка за 30 днів.</p>
         </div>
-        <button type="button" className="button button--primary" onClick={runNow} disabled={busy}>
-          {busy ? 'Запускаю…' : 'Зібрати зараз'}
-        </button>
+        <button className="button" type="button" onClick={load}>Оновити</button>
       </div>
+      {error && <p style={{ color: 'var(--bad)' }}>{error}</p>}
 
-      {flash && <div className="page__hint">{flash}</div>}
-
-      <div className="page__row">
-        <StatCard label="Активні вітки" value={stats?.active_branches ?? '—'} hint={"на сьогодні:"} />
-        <StatCard label="В роботі" value={stats?.orders_active ?? '—'} hint={"Ваші робочі вітки"}/>
-        <StatCard label="Нових сьогодні" value={stats?.orders_new_today ?? '—'} delta={stats ? delta(stats.orders_new_today, stats.orders_yesterday) : null} hint="проти вчора" />
-        <StatCard label="За 7 днів" value={stats?.orders_last_7_days ?? '—'} delta={stats ? delta(stats.orders_last_7_days, stats.orders_prev_7_days) : null} hint="проти минулого тижня" />
-        <StatCard label="Сер. чек" value={stats ? money(stats.avg_budget_cents) : '—'} hint={stats?.top_source ? `топ-джерело: ${stats.top_source}` : undefined} />
-        <StatCard label="Виграно" value={stats?.won_total ?? '—'} hint={stats ? `за місяць: ${stats.won_month}` : undefined} />
-      </div>
-
-      <div className="radar-dashboard">
-        <FreshInbox onChange={load} />
-        <div className="radar-dashboard__side">
-          <div className="card">
-            <h2 className="feed__title">Статуси за 7 днів</h2>
-            <Donut parts={donutParts} />
+      {loading && !data ? (
+        <p className="empty-hint">Завантаження…</p>
+      ) : (
+        <>
+          <div className="stat-row">
+            <div className="card"><StatCard label="Замовлень усього" value={totals.orders ?? '—'} /></div>
+            <div className="card"><StatCard label="За 7 днів" value={totals.orders_week ?? '—'} /></div>
+            <div className="card"><StatCard label="Нових" value={totals.new_orders ?? '—'} /></div>
+            <div className="card"><StatCard label="Заявок" value={totals.applications ?? '—'} /></div>
+            <div className="card"><StatCard label="Активних джерел" value={totals.active_sources ?? '—'} /></div>
+            {statusParts.length > 0 && (
+              <div className="donut-card">
+                <Donut parts={statusParts} size={110} />
+                <div className="donut-card__legend">
+                  {statusParts.map((part) => (
+                    <div key={part.label} className="donut-card__legend-item">
+                      <span className="status-dot" style={{ background: part.color }} />
+                      {part.label}: {part.value}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
-          <SourcePipeline />
-          <EventFeed />
-        </div>
-      </div>
+
+          <h2 className="section-title">Динаміка надходжень (30 днів)</h2>
+          <div className="card" style={{ padding: '16px 18px' }}>
+            {daily.length === 0 ? (
+              <p className="empty-hint">Даних ще немає — запусти збір на сторінці «Налаштування».</p>
+            ) : (
+              <div>
+                <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 110 }}>
+                  {daily.map((p) => (
+                    <div
+                      key={p.day}
+                      title={`${p.day}: ${p.count}`}
+                      style={{ flex: 1, background: 'var(--accent, #2f6fed)', height: `${Math.max(2, (p.count / maxDaily) * 100)}%`, minHeight: 2, borderRadius: 2 }}
+                    />
+                  ))}
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-dim)', marginTop: 6 }}>
+                  <span>{(daily[0] && daily[0].day || '').slice(5)}</span>
+                  <span>макс за добу: {maxDaily}</span>
+                  <span>{(daily[daily.length - 1] && daily[daily.length - 1].day || '').slice(5)}</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <h2 className="section-title">Джерела</h2>
+          <div className="grid__scroll">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Джерело</th>
+                  <th>Увімкнено</th>
+                  <th>Останній прогін</th>
+                  <th>Статус</th>
+                  <th>Знайдено</th>
+                  <th>Останній успіх</th>
+                </tr>
+              </thead>
+              <tbody>
+                {((data && data.sources) || []).map((s) => (
+                  <tr key={s.key}>
+                    <td>{s.name || s.key}</td>
+                    <td>{s.enabled ? 'так' : 'ні'}</td>
+                    <td>{formatDate(s.last_run_at)}</td>
+                    <td>
+                      <span className={`status-dot status-dot--${OUTCOME_DOT[s.last_outcome] || 'idle'}`} />
+                      {OUTCOME_LABELS[s.last_outcome] || s.last_outcome || '—'}
+                    </td>
+                    <td>{s.last_discovered}</td>
+                    <td>{formatDate(s.last_success_at)}</td>
+                  </tr>
+                ))}
+                {((data && data.sources) || []).length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="empty-hint">Джерел поки немає.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
     </section>
   );
 }
