@@ -3,14 +3,23 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import '@/styles/blocks/nav-enhance.scss';
+import {
+  TerminalIcon,
+  DashboardIcon,
+  OrdersIcon,
+  BranchesIcon,
+  DatabaseIcon,
+  ReportsIcon,
+  SettingsIcon,
+} from '@/components/Icons';
 
 const LINKS = [
-  { href: '/', label: 'Дашборд' },
-  { href: '/orders', label: 'Замовлення' },
-  { href: '/branches', label: 'Вітки' },
-  { href: '/database', label: 'База даних' },
-  { href: '/reports', label: 'Звіти' },
-  { href: '/settings', label: 'Налаштування' },
+  { href: '/', label: 'Дашборд', icon: DashboardIcon },
+  { href: '/orders', label: 'Замовлення', icon: OrdersIcon },
+  { href: '/branches', label: 'Вітки', icon: BranchesIcon },
+  { href: '/database', label: 'База даних', icon: DatabaseIcon },
+  { href: '/reports', label: 'Звіти', icon: ReportsIcon },
+  { href: '/settings', label: 'Налаштування', icon: SettingsIcon },
 ];
 
 export default function Nav() {
@@ -19,19 +28,25 @@ export default function Nav() {
   return (
     <header className="nav">
       <div className="nav__brand">
-        Junior<span>May</span>Work
+        <TerminalIcon size={16} style={{ color: 'var(--accent)' }} />
+        <span>Junior<span>May</span>Work</span>
         <span className="nav__live-dot" suppressHydrationWarning />
       </div>
       <nav className="nav__links">
-        {LINKS.map((l) => (
-          <Link
-            key={l.href}
-            href={l.href}
-            className={`nav__link ${pathname === l.href ? 'nav__link--active' : ''}`}
-          >
-            {l.label}
-          </Link>
-        ))}
+        {LINKS.map((l) => {
+          const Icon = l.icon;
+          const isActive = pathname === l.href;
+          return (
+            <Link
+              key={l.href}
+              href={l.href}
+              className={`nav__link ${isActive ? 'nav__link--active' : ''}`}
+            >
+              <Icon size={14} style={{ opacity: isActive ? 1 : 0.7 }} />
+              <span>{l.label}</span>
+            </Link>
+          );
+        })}
       </nav>
     </header>
   );
