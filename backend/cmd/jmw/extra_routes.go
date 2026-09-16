@@ -8,8 +8,8 @@ import (
 )
 
 // extraRoutes — реєстрація додаткових маршрутів (grid CRUD, PDF-звіти,
-// нотатки/історія/статуси замовлень) поверх основних маршрутів сервера,
-// без редагування Routes() у internal/api/misc.go.
+// нотатки/історія/статуси замовлень, дашборд) поверх основних маршрутів
+// сервера, без редагування Routes() у internal/api/misc.go.
 func extraRoutes(server *api.Server, allowedOrigin string, wsHandler http.HandlerFunc) http.Handler {
 	inner := server.Routes(allowedOrigin, wsHandler)
 
@@ -26,6 +26,7 @@ func extraRoutes(server *api.Server, allowedOrigin string, wsHandler http.Handle
 	extra.HandleFunc("POST /api/orders/{id}/notes", server.HandleOrderNoteCreate)
 	extra.HandleFunc("GET /api/orders/{id}/history", server.HandleOrderHistory)
 	extra.HandleFunc("PATCH /api/orders/{id}/status", server.HandleOrderStatusUpdate)
+	extra.HandleFunc("GET /api/dashboard", server.HandleDashboard)
 	// Невідомі шляхи (наприклад, /api/reports/summary чи базові /api/orders)
 	// ідуть в основний роутер.
 	extra.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -35,7 +36,8 @@ func extraRoutes(server *api.Server, allowedOrigin string, wsHandler http.Handle
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		p := r.URL.Path
 		if strings.HasPrefix(p, "/api/grid") || strings.HasPrefix(p, "/api/runs") ||
-			strings.HasPrefix(p, "/api/reports/") || strings.HasPrefix(p, "/api/orders") {
+			strings.HasPrefix(p, "/api/reports/") || strings.HasPrefix(p, "/api/orders") ||
+			strings.HasPrefix(p, "/api/dashboard") {
 			extra.ServeHTTP(w, r)
 			return
 		}
