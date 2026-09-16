@@ -29,6 +29,19 @@ DROP TABLE IF EXISTS sources               CASCADE;
 DROP TABLE IF EXISTS branches              CASCADE;
 DROP TABLE IF EXISTS schema_nodes           CASCADE;
 
+-- Залишки v2 з міграцій 002/006, які не покриває CASCADE вище
+-- (FK-обмеження дропаються разом із цільовою таблицею, а не навпаки):
+DROP TABLE IF EXISTS search_run_daily_stats CASCADE;
+DROP TABLE IF EXISTS application_results    CASCADE;
+DROP TABLE IF EXISTS audit_log              CASCADE;
+DROP TABLE IF EXISTS tags                   CASCADE;
+DROP TABLE IF EXISTS schema_layouts         CASCADE;
+
+-- Старі view-и v2 (міграція 006):
+DROP VIEW IF EXISTS v_order_board;
+DROP VIEW IF EXISTS v_source_health;
+DROP VIEW IF EXISTS v_daily_intake;
+
 -- ============================================================
 -- 2. ДОВІДНИКИ
 -- ============================================================
@@ -132,14 +145,14 @@ CREATE TABLE scrape_runs (
 -- M:N: що конкретний запуск знайшов.
 CREATE TABLE order_matches (
   run_id          BIGINT NOT NULL REFERENCES scrape_runs(id) ON DELETE CASCADE,
-  order_id         BIGINT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  order_id        BIGINT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
   relevance_score INTEGER NOT NULL DEFAULT 0,
   captured_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (run_id, order_id)
 );
 
 -- ============================================================
--- 6. АРХІВ ЗНИКЛИХ ЗАМОВЛЕННЬ
+-- 6. АРХІВ ЗНИКЛИХ ЗАМОВЛЕНЬ
 -- ============================================================
 
 -- Снапшот: source зберігається ключем (без FK) — джерело може бути
