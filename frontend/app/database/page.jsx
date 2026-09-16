@@ -15,6 +15,15 @@ const TABLE_LABELS = {
   search_profiles: 'Профілі пошуку',
   search_runs: 'Прогони пошуку',
   reports: 'Звіти',
+  order_statuses: 'Статуси замовлень',
+  application_results: 'Результати заявок',
+  skills: 'Навички',
+  tags: 'Теги',
+  order_notes: 'Нотатки до замовлень',
+  order_status_history: 'Історія статусів',
+  audit_log: 'Журнал аудиту',
+  report_downloads: 'Завантаження звітів',
+  search_run_daily_stats: 'Щоденна статистика',
 };
 
 async function gridRequest(path, options = {}) {

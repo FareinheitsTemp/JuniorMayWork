@@ -6,6 +6,7 @@ import '@/styles/blocks/nav-enhance.scss';
 
 const LINKS = [
   { href: '/', label: 'Дашборд' },
+  { href: '/orders', label: 'Замовлення' },
   { href: '/branches', label: 'Вітки' },
   { href: '/database', label: 'База даних' },
   { href: '/reports', label: 'Звіти' },
@@ -14,6 +15,7 @@ const LINKS = [
 
 export default function Nav() {
   const pathname = usePathname();
+
   return (
     <header className="nav">
       <div className="nav__brand">
