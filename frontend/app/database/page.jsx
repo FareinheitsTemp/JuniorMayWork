@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import DataTable from '@/components/DataTable';
+import { TerminalIcon, PlusIcon, EditIcon, TrashIcon, CloseIcon } from '@/components/Icons';
 import '@/styles/blocks/grid-extra.scss';
 
 const TABLE_LABELS = {
@@ -186,8 +187,13 @@ export default function DatabasePage() {
       sortable: false,
       render: (row) => (
         <div className="row-actions">
-          <button className="button button--sm" type="button" onClick={() => startEdit(row)}>✎ Редагувати</button>
-          <button className="button button--danger button--sm" type="button" onClick={() => removeRow(row)}>✕</button>
+          <button className="button button--sm" type="button" onClick={() => startEdit(row)}>
+            <EditIcon size={12} />
+            <span>Редагувати</span>
+          </button>
+          <button className="button button--danger button--sm" type="button" onClick={() => removeRow(row)}>
+            <TrashIcon size={12} />
+          </button>
         </div>
       ),
     },
@@ -198,13 +204,14 @@ export default function DatabasePage() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent)', fontSize: 13, fontWeight: 600 }}>›_</span>
+            <TerminalIcon size={18} style={{ color: 'var(--accent)' }} />
             <h1 className="page__title">SQL Data Grid</h1>
           </div>
           <p className="page__subtitle">Прямий доступ до 19 таблиць бази даних v2: селектор, пошук, пагінація, CRUD-редагування.</p>
         </div>
         <button className="button button--primary" type="button" disabled={busy || !columns.length} onClick={startCreate}>
-          + Додати рядок
+          <PlusIcon size={14} />
+          <span>Додати рядок</span>
         </button>
       </div>
 
@@ -247,7 +254,9 @@ export default function DatabasePage() {
               <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--accent)' }}>
                 {creating ? `INSERT INTO ${table}` : `UPDATE ${table} WHERE id = ${editing.id}`}
               </span>
-              <button className="button button--sm" type="button" onClick={closeForm}>✕</button>
+              <button className="button button--sm" type="button" onClick={closeForm}>
+                <CloseIcon size={12} />
+              </button>
             </div>
 
             {formColumns.map((column) => (

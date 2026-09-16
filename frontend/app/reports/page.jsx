@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import StatCard from '@/components/StatCard';
 import Donut from '@/components/Donut';
+import { TerminalIcon, FileTextIcon, DownloadIcon, TrashIcon } from '@/components/Icons';
 import '@/styles/blocks/grid-extra.scss';
 
 const RUN_STATUS_LABELS = {
@@ -129,7 +130,7 @@ export default function ReportsPage() {
   return (
     <section className="page">
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent)', fontSize: 13, fontWeight: 600 }}>›_</span>
+        <TerminalIcon size={18} style={{ color: 'var(--accent)' }} />
         <h1 className="page__title">Звіти та аналітика</h1>
       </div>
       <p className="page__subtitle">Генерація багатосторінкових PDF-звітів, аналітика прогонів і архів експортів.</p>
@@ -157,10 +158,12 @@ export default function ReportsPage() {
 
       {lastReport && (
         <div className="report-banner">
-          <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--good)' }}>● PDF_READY</span>
-          <strong style={{ flex: 1 }}>{lastReport.file_name}</strong>
+          <FileTextIcon size={16} style={{ color: 'var(--good)' }} />
+          <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--good)' }}>PDF_READY:</span>
+          <strong style={{ flex: 1, fontFamily: 'var(--font-mono)' }}>{lastReport.file_name}</strong>
           <a className="button button--primary button--sm" href={lastReport.download}>
-            Завантажити PDF ↗
+            <DownloadIcon size={13} />
+            <span>Завантажити PDF</span>
           </a>
         </div>
       )}
@@ -222,7 +225,8 @@ export default function ReportsPage() {
                   </td>
                   <td style={{ textAlign: 'right' }}>
                     <button className="button button--primary button--sm" type="button" disabled={busyRun === run.id} onClick={() => generatePDF(run)}>
-                      {busyRun === run.id ? 'Генерація…' : 'Згенерувати PDF'}
+                      <FileTextIcon size={12} />
+                      <span>{busyRun === run.id ? 'Генерація…' : 'Згенерувати PDF'}</span>
                     </button>
                   </td>
                 </tr>
@@ -270,9 +274,12 @@ export default function ReportsPage() {
                 </td>
                 <td style={{ textAlign: 'right' }}>
                   <div className="row-actions">
-                    <a className="button button--sm" href={`/api/reports/${report.id}/download`}>Завантажити</a>
+                    <a className="button button--sm" href={`/api/reports/${report.id}/download`}>
+                      <DownloadIcon size={12} />
+                      <span>Завантажити</span>
+                    </a>
                     <button className="button button--danger button--sm" type="button" disabled={busyReport === report.id} onClick={() => removeReport(report)}>
-                      {busyReport === report.id ? '…' : '✕'}
+                      <TrashIcon size={12} />
                     </button>
                   </div>
                 </td>
