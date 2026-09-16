@@ -1,174 +1,268 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { api } from '@/lib/api';
-import { statusLabel } from '@/lib/status';
 
-const STATUSES = ['new', 'seen', 'applied', 'won', 'lost', 'archived'];
+const PAGE_SIZE = 100;
 
-function money(cents) {
-  if (cents == null) return '—';
-  return `$${(cents / 100).toLocaleString('en-US')}`;
+async function request(path, options = {}) {
+  const res = await fetch(`/api${path}`, {
+    headers: { 'Content-Type': 'application/json' },
+    ...options,
+  });
+  if (!res.ok) {
+    let message = `HTTP ${res.status}`;
+    try {
+      const body = await res.json();
+      if (body && body.error) message = body.error;
+    } catch {}
+    throw new Error(message);
+  }
+  return res.json();
 }
 
-// Замовлення: повний контроль над тим, що в БД — фільтри, статуси, вітки, заявки.
+function formatDate(value) {
+  if (!value) return '—';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString('uk-UA');
+}
+
+function money(cents, currency) {
+  if (!cents) return '—';
+  const amount = (cents / 100).toLocaleString('uk-UA');
+  return currency ? `${amount} ${currency}` : amount;
+}
+
+// Замовлення: пріоритетний список + панель деталей з нотатками й історією статусів.
 export default function OrdersPage() {
-  const [orders, setOrders] = useState([]);
-  const [branches, setBranches] = useState([]);
-  const [status, setStatus] = useState('');
-  const [branchId, setBranchId] = useState('');
-  const [query, setQuery] = useState('');
-  const [flash, setFlash] = useState('');
+  const [statuses, setStatuses] = useState([]);
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [selected, setSelected] = useState(null);
+  const [detail, setDetail] = useState(null);
+  const [noteText, setNoteText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [statusFilter, setStatusFilter] = useState('');
+  const [search, setSearch] = useState('');
 
   const load = useCallback(async () => {
+    setLoading(true);
     try {
-      const params = { limit: 300 };
-      if (status) params.status = status;
-      if (branchId) params.branch_id = branchId;
-      if (query) params.q = query;
-      const [ords, brs] = await Promise.all([api.orders(params), api.branches()]);
-      setOrders(ords || []);
-      setBranches(brs || []);
-    } catch (e) {
-      setFlash(`Помилка: ${e.message}`);
+      const [statusData, gridData] = await Promise.all([
+        request('/orders/statuses'),
+        request(`/grid/orders?limit=${PAGE_SIZE}`),
+      ]);
+      setStatuses(statusData.statuses || []);
+      setRows(gridData.rows || []);
+      setError('');
+    } catch (err) {
+      setError(`Дані недоступні: ${err.message}`);
+    } finally {
+      setLoading(false);
     }
-  }, [status, branchId, query]);
+  }, []);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  async function updateOrder(order, patch) {
+  const statusByKey = {};
+  statuses.forEach((s) => { statusByKey[s.key] = s; });
+
+  async function openOrder(row) {
+    setSelected(row);
+    setDetail(null);
+    setNoteText('');
     try {
-      await api.updateOrder(order.id, patch);
-      await load();
-    } catch (e) {
-      setFlash(`Помилка: ${e.message}`);
+      const [notesData, historyData] = await Promise.all([
+        request(`/orders/${row.id}/notes`),
+        request(`/orders/${row.id}/history`),
+      ]);
+      setDetail({ notes: notesData.notes || [], history: historyData.history || [] });
+    } catch (err) {
+      setDetail({ notes: [], history: [] });
+      setError(`Деталі недоступні: ${err.message}`);
     }
   }
 
-  async function applyTo(order) {
+  function closeOrder() {
+    setSelected(null);
+    setDetail(null);
+    setNoteText('');
+  }
+
+  async function changeStatus(order, statusKey) {
+    if (!statusKey || statusKey === order.status) return;
+    setBusy(true);
     try {
-      await api.apply(order.id);
-      setFlash(`Заявку на «${order.title}» подано`);
+      await request(`/orders/${order.id}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: statusKey }),
+      });
+      setSelected({ ...order, status: statusKey });
+      const historyData = await request(`/orders/${order.id}/history`);
+      setDetail((prev) => ({ notes: (prev && prev.notes) || [], history: historyData.history || [] }));
       await load();
-    } catch (e) {
-      setFlash(`Помилка: ${e.message}`);
+    } catch (err) {
+      setError(`Не вдалося змінити статус: ${err.message}`);
+    } finally {
+      setBusy(false);
     }
   }
 
-  async function remove(order) {
-    if (!window.confirm(`Видалити «${order.title}» з БД?`)) return;
+  async function addNote(order) {
+    const body = noteText.trim();
+    if (!body) return;
+    setBusy(true);
     try {
-      await api.deleteOrder(order.id);
-      await load();
-    } catch (e) {
-      setFlash(`Помилка: ${e.message}`);
+      await request(`/orders/${order.id}/notes`, {
+        method: 'POST',
+        body: JSON.stringify({ body }),
+      });
+      setNoteText('');
+      const notesData = await request(`/orders/${order.id}/notes`);
+      setDetail((prev) => ({ history: (prev && prev.history) || [], notes: notesData.notes || [] }));
+    } catch (err) {
+      setError(`Не вдалося додати нотатку: ${err.message}`);
+    } finally {
+      setBusy(false);
     }
   }
+
+  const visible = rows.filter((row) => {
+    if (statusFilter && row.status !== statusFilter) return false;
+    if (search) {
+      const haystack = `${row.title || ''} ${row.source || ''}`.toLowerCase();
+      if (!haystack.includes(search.toLowerCase())) return false;
+    }
+    return true;
+  });
 
   return (
     <section className="page">
       <h1 className="page__title">Замовлення</h1>
-      {flash && <div className="page__hint">{flash}</div>}
+      <p className="page__subtitle">Пріоритетний список знайдених замовлень: нотатки, історія і зміна статусів.</p>
+      {error && <p className="page__hint">{error}</p>}
 
-      <div className="page__row">
-        <div className="field">
-          <label className="field__label" htmlFor="f-status">Статус</label>
-          <select id="f-status" className="select" value={status} onChange={(e) => setStatus(e.target.value)}>
-            <option value="">усі</option>
-            {STATUSES.map((s) => (
-              <option key={s} value={s}>{statusLabel(s)}</option>
-            ))}
-          </select>
-        </div>
-        <div className="field">
-          <label className="field__label" htmlFor="f-branch">Вітка</label>
-          <select id="f-branch" className="select" value={branchId} onChange={(e) => setBranchId(e.target.value)}>
-            <option value="">усі</option>
-            {branches.map((b) => (
-              <option key={b.id} value={b.id}>{b.name}</option>
-            ))}
-          </select>
-        </div>
-        <div className="field">
-          <label className="field__label" htmlFor="f-q">Пошук</label>
-          <input
-            id="f-q"
-            className="input"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="react, лендінг…"
-          />
-        </div>
+      <div className="tabs">
+        <button type="button" className={`tab ${statusFilter === '' ? 'tab--active' : ''}`} onClick={() => setStatusFilter('')}>Усі</button>
+        {statuses.map((s) => (
+          <button type="button" key={s.key} className={`tab ${statusFilter === s.key ? 'tab--active' : ''}`} onClick={() => setStatusFilter(s.key)}>
+            {s.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="field" style={{ marginBottom: 12 }}>
+        <input className="input" placeholder="Пошук за назвою чи джерелом…" value={search} onChange={(e) => setSearch(e.target.value)} />
       </div>
 
       <div className="card">
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Замовлення</th>
-              <th>Джерело</th>
-              <th>Бюджет</th>
-              <th>Вітка</th>
-              <th>Статус</th>
-              <th>Дії</th>
-            </tr>
-          </thead>
-          <tbody>
-            {orders.length === 0 && (
+        {loading ? (
+          <p className="page__hint">Завантаження…</p>
+        ) : (
+          <table className="table">
+            <thead>
               <tr>
-                <td colSpan={6} className="page__hint">Нічого не знайдено.</td>
+                <th>id</th>
+                <th>Замовлення</th>
+                <th>Джерело</th>
+                <th>Бюджет</th>
+                <th>Статус</th>
+                <th>Побачено</th>
               </tr>
-            )}
-            {orders.map((o) => (
-              <tr key={o.id}>
-                <td>
-                  <a href={o.url} target="_blank" rel="noreferrer">{o.title}</a>
-                </td>
-                <td>{o.source}</td>
-                <td>{money(o.budget_cents)}</td>
-                <td>
-                  <select
-                    className="select"
-                    value={o.branch_id ?? ''}
-                    onChange={(e) => e.target.value && updateOrder(o, { branch_id: Number(e.target.value) })}
-                  >
-                    <option value="">—</option>
-                    {branches.map((b) => (
-                      <option key={b.id} value={b.id}>{b.name}</option>
-                    ))}
-                  </select>
-                </td>
-                <td>
-                  <select
-                    className="select"
-                    value={o.status}
-                    onChange={(e) => updateOrder(o, { status: e.target.value })}
-                  >
-                    {STATUSES.map((s) => (
-                      <option key={s} value={s}>{statusLabel(s)}</option>
-                    ))}
-                  </select>
-                </td>
-                <td>
-                  <div className="leaf__actions">
-                    <button
-                      type="button"
-                      className="button button--primary"
-                      onClick={() => applyTo(o)}
-                      disabled={o.status !== 'new' && o.status !== 'seen'}
-                    >
-                      Заявка
-                    </button>
-                    <button type="button" className="button button--danger" onClick={() => remove(o)}>×</button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {visible.map((row) => {
+                const st = statusByKey[row.status];
+                return (
+                  <tr key={row.id} style={{ cursor: 'pointer' }} onClick={() => openOrder(row)}>
+                    <td>#{row.id}</td>
+                    <td>
+                      {row.url ? (
+                        <a href={row.url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>{row.title || '—'}</a>
+                      ) : (row.title || '—')}
+                    </td>
+                    <td>{row.source || '—'}</td>
+                    <td>{money(row.budget_cents, row.currency)}</td>
+                    <td>
+                      <span className="status-dot" style={{ background: (st && st.color) || '#8f9cb2' }} />
+                      {' '}{(st && st.label) || row.status || '—'}
+                    </td>
+                    <td>{formatDate(row.first_seen_at)}</td>
+                  </tr>
+                );
+              })}
+              {visible.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="page__hint">Замовлень не знайдено.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        )}
       </div>
+
+      {selected && (
+        <div className="modal-overlay" onClick={closeOrder}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <h2 style={{ marginTop: 0, fontSize: 18 }}>{selected.title || `Замовлення #${selected.id}`}</h2>
+            <p style={{ color: '#8b95a8', fontSize: 13 }}>
+              #{selected.id} · {selected.source || '—'} · {money(selected.budget_cents, selected.currency)} · {formatDate(selected.first_seen_at)}
+            </p>
+            {selected.url && (
+              <p>
+                <a href={selected.url} target="_blank" rel="noreferrer">Відкрити джерело ↗</a>
+              </p>
+            )}
+
+            <div className="field">
+              <label className="field__label">Статус</label>
+              <select className="select" value={selected.status || ''} disabled={busy} onChange={(e) => changeStatus(selected, e.target.value)}>
+                <option value="" disabled>— оберіть статус —</option>
+                {statuses.map((s) => (
+                  <option key={s.key} value={s.key}>{s.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <h3 style={{ fontSize: 15 }}>Нотатки</h3>
+            <div className="field">
+              <textarea className="textarea" placeholder="Нова нотатка…" value={noteText} onChange={(e) => setNoteText(e.target.value)} />
+              <button className="button" type="button" disabled={busy || !noteText.trim()} onClick={() => addNote(selected)}>Додати нотатку</button>
+            </div>
+            <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+              {((detail && detail.notes) || []).map((note) => (
+                <li key={note.id} className="card" style={{ marginBottom: 8, padding: '8px 10px' }}>
+                  <div style={{ fontSize: 13 }}>{note.body}</div>
+                  <div style={{ fontSize: 11, color: '#8b95a8' }}>{formatDate(note.created_at)}</div>
+                </li>
+              ))}
+              {((detail && detail.notes) || []).length === 0 && (
+                <li className="page__hint">Нотаток ще немає.</li>
+              )}
+            </ul>
+
+            <h3 style={{ fontSize: 15 }}>Історія статусів</h3>
+            <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+              {((detail && detail.history) || []).map((change) => (
+                <li key={change.id} style={{ marginBottom: 6, fontSize: 13 }}>
+                  <span className="status-dot" style={{ background: (statusByKey[change.to_status] && statusByKey[change.to_status].color) || '#8f9cb2' }} />
+                  {' '}{change.from_status ? `${change.from_status} → ` : ''}{change.to_status}
+                  {' · '}{formatDate(change.changed_at)}{change.actor ? ` · ${change.actor}` : ''}
+                </li>
+              ))}
+              {((detail && detail.history) || []).length === 0 && (
+                <li className="page__hint">Змін статусу ще не було.</li>
+              )}
+            </ul>
+
+            <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+              <button className="button" type="button" onClick={closeOrder}>Закрити</button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
