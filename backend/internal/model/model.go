@@ -23,6 +23,7 @@ type Order struct {
 	SourceKey       string     `json:"source_key"`        // JOIN із sources для UI
 	SourceMessageID *string    `json:"source_message_id"` // дедуп-ключ
 	Title           string     `json:"title"`
+	Description     string     `json:"description"`
 	Status          string     `json:"status"`
 	BudgetCents     *int32     `json:"budget_cents"`
 	ExternalURL     string     `json:"external_url"`
@@ -48,7 +49,7 @@ type Listing struct {
 	SourceKey       string
 	SourceMessageID string
 	Title           string
-	Description     string // парситься джерелом; в БД v4 не зберігається
+	Description     string
 	URL             string
 	BudgetCents     *int32
 	PublishedAt     *time.Time
