@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import '@/styles/blocks/grid-extra.scss';
 
 const PAGE_SIZE = 100;
 

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import StatCard from '@/components/StatCard';
 import Donut from '@/components/Donut';
+import '@/styles/blocks/grid-extra.scss';
 
 async function request(path, options = {}) {
   const res = await fetch(`/api${path}`, {
