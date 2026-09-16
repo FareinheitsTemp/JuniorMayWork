@@ -224,9 +224,10 @@ func drawDailyChart(pdf *fpdf.Fpdf, r store.PDFRunReport) {
 			maxCount = p.Count
 		}
 	}
-	const x, w, h = 15, 180, 44
+	const x, w = 15.0, 180.0
+	const h float64 = 44.0
 	base := pdf.GetY() + h
-	plotH := h - 6
+	plotH := h - 6.0
 	pdf.SetDrawColor(180, 186, 196)
 	pdf.SetLineWidth(0.2)
 	pdf.Line(x, base, x+w, base)
