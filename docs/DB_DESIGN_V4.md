@@ -1,23 +1,22 @@
 # JuniorMayWork — Проєкт бази даних v4
 
-**Статус:** затверджений дизайн — джерело істини для міграції `backend/migrations/010_v4_rebuild.sql`.
-Замінює `DB_DESIGN_V2.md` повністю.
+**Статус:** затверджений дизайн — джерело істини для міграцій `010–012`.
 
 ## Принципи v4
 
-1. **Один користувач, локальна прога** — жодних users, заявок, подій, нотаток.
-2. **12 таблиць-фактів + 6 звітних view-ів** («вихідні таблиці» для звітів і діаграм).
-3. **Кожен FK — з явною політикою видалення:** CASCADE (дочірнє гине з батьком),
-   SET NULL (не обов'язкові посилання), RESTRICT (довідники не видаляємо під живими даними).
-4. **Статуси — CHECK** (`new/seen/won/lost/archived`): для одного юзера lookup-таблиця — надмірність.
-5. **Дедуп:** `UNIQUE (source_id, source_message_id)` — той самий постинг двічі не тягнемо.
-6. **Архів зниклих — у БД** (`archived_orders`, снапшот JSONB), не JSON-файл: можна запитати «що пропало за тиждень».
+1. Один користувач, локальна прога — без users, заявок, подій і нотаток.
+2. **13 таблиць-фактів + 7 звітних view-ів.**
+3. Усі FK мають явний `ON DELETE`; дані звітів беруться із view-ів, не з копій.
+4. Статуси замовлень — CHECK: `new/seen/won/lost/archived`.
+5. Дедуп: `UNIQUE(source_id, source_message_id)`.
+6. Опис замовлення зберігається в `orders.description` (міграція 011).
 
 ## ER-діаграма
 
 ```mermaid
 erDiagram
     SOURCES ||--o{ SOURCE_CHANNELS : "має канали"
+    SOURCES ||--o{ SOURCE_RUNS : "лог читання"
     SOURCES ||--o{ ORDERS : "дає замовлення"
     ORDERS ||--o{ ORDER_SKILLS : ""
     SKILLS ||--o{ ORDER_SKILLS : ""
@@ -25,77 +24,39 @@ erDiagram
     SKILLS ||--o{ PROFILE_SKILLS : ""
     PROFILES ||--o{ PROFILE_SOURCES : ""
     SOURCES ||--o{ PROFILE_SOURCES : ""
-    PROFILES ||--o{ SCRAPE_RUNS : "запускається"
+    PROFILES ||--o{ SCRAPE_RUNS : "виконується"
     SCRAPE_RUNS ||--o{ ORDER_MATCHES : ""
     ORDERS ||--o{ ORDER_MATCHES : ""
 ```
 
-Схема потоків:
-
-1. **Збір:** `sources` → скрейпер → `orders` (+ `order_skills`), дедуп через `UNIQUE(source_id, source_message_id)`.
-2. **Пошук:** `profiles` (+ `profile_skills`, `profile_sources`) → `scrape_runs` → `order_matches` → які `orders` збіглись.
-3. **Архів:** зникле з джерела замовлення переноситься в `archived_orders` і видаляється з `orders` (ознака зникнення — `orders.last_seen_at` давніше за поріг).
-
-## Розкладка таблиць
+## 13 таблиць
 
 | # | Таблиця | Призначення |
 |---|---|---|
-| 1 | `sources` | джерела збору (api/telegram/rss/html) |
-| 2 | `source_channels` | TG-канали усередині джерела |
-| 3 | `skills` | довідник навичок |
-| 4 | `orders` | ядро: замовлення |
-| 5 | `order_skills` | M:N замовлення ↔ навички |
-| 6 | `profiles` | збережені критерії пошуку (мова, макс. бюджет, дата з—по, ліміт) |
-| 7 | `profile_skills` | M:N профіль ↔ навички |
-| 8 | `profile_sources` | M:N профіль ↔ джерела |
-| 9 | `scrape_runs` | лог запусків профілю |
-| 10 | `order_matches` | M:N запуск ↔ знайдені замовлення |
-| 11 | `archived_orders` | снапшот зниклих замовлень |
-| 12 | `app_settings` | налаштування проги (ключ-значення) |
+| 1 | `sources` | джерела збору |
+| 2 | `source_channels` | Telegram-канали джерела |
+| 3 | `source_runs` | технічний лог здоров'я конкретного джерела |
+| 4 | `skills` | довідник навичок |
+| 5 | `orders` | замовлення: назва, **опис**, статус, бюджет, дати |
+| 6 | `order_skills` | M:N orders ↔ skills |
+| 7 | `profiles` | збережені критерії пошуку |
+| 8 | `profile_skills` | M:N profiles ↔ skills |
+| 9 | `profile_sources` | M:N profiles ↔ sources |
+| 10 | `scrape_runs` | результат виконання профілю |
+| 11 | `order_matches` | M:N запуск профілю ↔ знайдені замовлення |
+| 12 | `archived_orders` | снапшот зниклих замовлень |
+| 13 | `app_settings` | налаштування проги |
 
-## Мапа v2 → v4
+## Чому є два види запусків
 
-| Було (v2) | Стало (v4) |
+| Таблиця | Питання, на яке відповідає |
 |---|---|
-| `branches` (вітки з ключовими словами) | `profiles` + `profile_skills` + `profile_sources` (критерії, не ручні групи) |
-| `orders.status` TEXT + `status_id` FK | лише `status` з CHECK |
-| `orders.skills` TEXT[] + `order_skills` | лише M:N `order_skills` |
-| `orders.source` TEXT + `source_id` | лише `source_id` FK |
-| `events` (live-фід) | прибрано |
-| `applications`, `order_notes`, `order_status_history` | прибрано (один юзер, заявки не трекаємо в БД) |
-| `search_profiles` + `search_runs` + `order_discoveries` | `profiles` + `scrape_runs` + `order_matches` |
-| `reports` / `report_exports` / `report_downloads` | view-и: звіти обчислюються, не зберігаються |
-| JSON-архів на диску | таблиця `archived_orders` |
-| `schema_nodes` (ERD у БД) | ERD у фронті (`SchemaMap.jsx`) |
+| `source_runs` | «Djinni зараз працює? Яка була остання помилка? Скільки постингів він віддав?» |
+| `scrape_runs` | «Коли профіль React до $100 запускався? Які замовлення він підібрав?» |
 
-## Звітний шар (view-и)
+Це не дублювання: перша таблиця описує технічний транспорт, друга — бізнес-результат твого фільтра.
 
-| View | Що дає |
-|---|---|
-| `v_orders_full` | широка картка замовлення (джерело, навички масивом) — експорт/PDF |
-| `v_status_summary` | донат «за статусами» |
-| `v_skill_demand` | попит за навичками + середній бюджет |
-| `v_daily_dynamics` | динаміка по днях для лінійних графіків |
-| `v_profile_stats` | ефективність профілів |
-| `v_archive_history` | що і коли зникало |
+## View-и для звітів
 
-Приклади:
-
-```sql
--- звіт за місяць, готовий до заливки в PDF
-SELECT * FROM v_orders_full
-WHERE first_seen_at >= '2026-09-01' AND first_seen_at < '2026-10-01';
-
--- топ-5 навичок за попитом
-SELECT * FROM v_skill_demand ORDER BY orders_count DESC LIMIT 5;
-
--- кандидати в архів
-SELECT id, title FROM orders WHERE last_seen_at < now() - interval '7 days';
-```
-
-## Наслідки для коду (етап 2)
-
-- `store`: CRUD замовлень/профілів на нових колонках; дедуп через `UNIQUE(source_id, source_message_id)`.
-- `scraper`: upsert із `last_seen_at`; зниклі → перенесення в `archived_orders`.
-- `reportgen`: читає з view-ів (`SELECT * FROM v_orders_full ...`).
-- Фронт: донати/графіки з view-ів, ERD-мапа під 12 таблиць.
+- `v_orders_full`, `v_status_summary`, `v_skill_demand`, `v_daily_dynamics`, `v_profile_stats`, `v_archive_history` — з міграції 010.
+- `v_source_health` — з міграції 012; показує останній результат по кожному джерелу.

@@ -76,11 +76,21 @@ type Skill struct { ID int64 `json:"id"`; Name string `json:"name"` }
 type Source struct { ID int32 `json:"id"`; Key string `json:"key"`; Name string `json:"name"`; Kind string `json:"kind"`; Enabled bool `json:"enabled"` }
 type SourceChannel struct { ID int32 `json:"id"`; SourceID int32 `json:"source_id"`; Handle string `json:"handle"`; Title string `json:"title"`; Enabled bool `json:"enabled"` }
 
+type SourceRun struct {
+	ID         int64      `json:"id"`
+	SourceID   int32      `json:"source_id"`
+	StartedAt  time.Time  `json:"started_at"`
+	FinishedAt *time.Time `json:"finished_at"`
+	Outcome    string     `json:"outcome"`
+	ErrorText  string     `json:"error_text"`
+	Stats      RunStats   `json:"stats"`
+}
+
 type ScrapeRun struct {
 	ID int64 `json:"id"`
 	ProfileID int64 `json:"profile_id"`
 	StartedAt time.Time `json:"started_at"`
-	FinishedAt *time.Time `json:"finished_at"`
+	FinishedAt *time.Time `json:"finished_at"
 	Outcome string `json:"outcome"`
 	ErrorText string `json:"error_text"`
 	Stats RunStats `json:"stats"`
